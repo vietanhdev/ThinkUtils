@@ -1,0 +1,13 @@
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Center circle -->
+  <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="currentColor" stroke-width="0.5"/>
+  
+  <!-- Blade 1 - Top (12 o'clock) -->
+  <path d="M 12 9.5 Q 9 7 9 4 Q 9 2 12 2 Q 15 2 15 4 Q 15 7 12 9.5 Z" fill="currentColor" opacity="0.85"/>
+  
+  <!-- Blade 2 - Bottom Right (4 o'clock) -->
+  <path d="M 14.5 12 Q 17 15 20 15 Q 22 15 22 12 Q 22 9 20 9 Q 17 9 14.5 12 Z" fill="currentColor" opacity="0.85"/>
+  
+  <!-- Blade 3 - Bottom Left (8 o'clock) -->
+  <path d="M 9.5 12 Q 7 15 4 15 Q 2 15 2 12 Q 2 9 4 9 Q 7 9 9.5 12 Z" fill="currentColor" opacity="0.85"/>
+</svg>
