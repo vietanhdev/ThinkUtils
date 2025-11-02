@@ -3,29 +3,33 @@ const { invoke } = window.__TAURI__.core;
 
 export function setupTitlebar() {
   console.log('[Titlebar] Setting up window controls');
-  
+
   const titlebar = document.querySelector('.titlebar');
   const minimizeBtn = document.getElementById('minimize-btn');
   const maximizeBtn = document.getElementById('maximize-btn');
   const closeBtn = document.getElementById('close-btn');
-  
+
   if (!minimizeBtn || !maximizeBtn || !closeBtn) {
     console.error('[Titlebar] Buttons not found');
     return;
   }
-  
+
   if (titlebar) {
     titlebar.addEventListener('mousedown', async (e) => {
-      if (e.target.closest('.titlebar-button')) return;
+      if (e.target.closest('.titlebar-button')) {
+        return;
+      }
       try {
         await invoke('start_drag');
       } catch (e) {
         console.error('[Titlebar] Drag failed:', e);
       }
     });
-    
+
     titlebar.addEventListener('dblclick', async (e) => {
-      if (e.target.closest('.titlebar-button')) return;
+      if (e.target.closest('.titlebar-button')) {
+        return;
+      }
       try {
         await invoke('toggle_maximize');
       } catch (e) {
@@ -33,7 +37,7 @@ export function setupTitlebar() {
       }
     });
   }
-  
+
   minimizeBtn.addEventListener('click', async () => {
     try {
       await invoke('minimize_window');
@@ -41,7 +45,7 @@ export function setupTitlebar() {
       console.error('[Titlebar] Minimize failed:', e);
     }
   });
-  
+
   maximizeBtn.addEventListener('click', async () => {
     try {
       await invoke('toggle_maximize');
@@ -49,7 +53,7 @@ export function setupTitlebar() {
       console.error('[Titlebar] Maximize failed:', e);
     }
   });
-  
+
   closeBtn.addEventListener('click', async () => {
     try {
       await invoke('close_window');

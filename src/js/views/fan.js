@@ -1,7 +1,7 @@
 // Fan Control View
 const { invoke } = window.__TAURI__.core;
 import { elements } from '../dom.js';
-import { state, setState, getState } from '../state.js';
+import { setState, getState } from '../state.js';
 import { showStatus } from '../utils.js';
 
 export function setupFanControl() {
@@ -38,7 +38,7 @@ export async function checkInitialPermissions() {
 export async function updateSensorData() {
   try {
     const response = await invoke('get_sensor_data');
-    
+
     if (response.success && response.data) {
       updateTemperatureDisplay(response.data.temps);
       updateFanDisplay(response.data.fans);
@@ -50,28 +50,32 @@ export async function updateSensorData() {
 
 function updateTemperatureDisplay(temps) {
   elements.tempMetrics.innerHTML = '';
-  
+
   if (Object.keys(temps).length === 0) {
-    elements.tempMetrics.innerHTML = '<div class="metric-row"><span class="metric-label">No data</span></div>';
+    elements.tempMetrics.innerHTML =
+      '<div class="metric-row"><span class="metric-label">No data</span></div>';
     return;
   }
 
-  Object.entries(temps).sort((a, b) => a[0].localeCompare(b[0])).forEach(([label, value]) => {
-    const row = document.createElement('div');
-    row.className = 'metric-row';
-    row.innerHTML = `
+  Object.entries(temps)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .forEach(([label, value]) => {
+      const row = document.createElement('div');
+      row.className = 'metric-row';
+      row.innerHTML = `
       <span class="metric-label">${label}</span>
       <span class="metric-value">${value}</span>
     `;
-    elements.tempMetrics.appendChild(row);
-  });
+      elements.tempMetrics.appendChild(row);
+    });
 }
 
 function updateFanDisplay(fans) {
   elements.fanMetrics.innerHTML = '';
-  
+
   if (Object.keys(fans).length === 0) {
-    elements.fanMetrics.innerHTML = '<div class="metric-row"><span class="metric-label">No data</span></div>';
+    elements.fanMetrics.innerHTML =
+      '<div class="metric-row"><span class="metric-label">No data</span></div>';
     return;
   }
 
@@ -84,9 +88,15 @@ function updateFanDisplay(fans) {
     .sort((a, b) => {
       const indexA = sortOrder.indexOf(a[0]);
       const indexB = sortOrder.indexOf(b[0]);
-      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-      if (indexA !== -1) return -1;
-      if (indexB !== -1) return 1;
+      if (indexA !== -1 && indexB !== -1) {
+        return indexA - indexB;
+      }
+      if (indexA !== -1) {
+        return -1;
+      }
+      if (indexB !== -1) {
+        return 1;
+      }
       return a[0].localeCompare(b[0]);
     })
     .forEach(([label, value]) => {
@@ -102,11 +112,11 @@ function updateFanDisplay(fans) {
 
 function updateUIFromFanLevel(level) {
   const levelStr = level.toString().toLowerCase();
-  
-  [elements.btnAuto, elements.btnManual, elements.btnFull].forEach(btn => {
+
+  [elements.btnAuto, elements.btnManual, elements.btnFull].forEach((btn) => {
     btn.classList.remove('active');
   });
-  
+
   if (levelStr === 'auto') {
     setState('currentFanMode', 'auto');
     elements.btnAuto.classList.add('active');
@@ -133,16 +143,16 @@ async function setFanMode(mode, level = null) {
     showStatus('Please wait...', 'info');
     return;
   }
-  
+
   setState('currentFanMode', mode);
-  
-  [elements.btnAuto, elements.btnManual, elements.btnFull].forEach(btn => {
+
+  [elements.btnAuto, elements.btnManual, elements.btnFull].forEach((btn) => {
     btn.classList.remove('active');
   });
-  
+
   let speedValue;
   let statusText;
-  
+
   switch (mode) {
     case 'auto':
       elements.btnAuto.classList.add('active');
@@ -151,7 +161,7 @@ async function setFanMode(mode, level = null) {
       speedValue = 'auto';
       statusText = 'Fan mode: Auto';
       break;
-    
+
     case 'manual':
       elements.btnManual.classList.add('active');
       speedValue = level || elements.slider.value;
@@ -159,7 +169,7 @@ async function setFanMode(mode, level = null) {
       elements.sliderSection.style.display = 'block';
       statusText = `Fan level: ${speedValue}`;
       break;
-    
+
     case 'full':
       elements.btnFull.classList.add('active');
       elements.currentMode.textContent = 'MAX';
@@ -168,28 +178,28 @@ async function setFanMode(mode, level = null) {
       statusText = 'Fan mode: Maximum';
       break;
   }
-  
+
   if (getState('lastFanSpeedSet') === speedValue) {
     showStatus(statusText, 'success');
     return;
   }
-  
+
   setState('fanControlInProgress', true);
   setState('lastFanSpeedSet', speedValue);
-  
+
   showStatus('Setting fan speed...', 'info');
-  
+
   try {
     const response = await invoke('set_fan_speed', { speed: speedValue });
-    
+
     if (response.success) {
       showStatus(statusText, 'success');
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
       await updateSensorData();
     } else {
       showStatus(`Error: ${response.error}`, 'error');
       setState('lastFanSpeedSet', null);
-      
+
       if (response.error && response.error.includes('Permission')) {
         elements.permissionHelper.style.display = 'flex';
       }
@@ -205,9 +215,9 @@ async function setFanMode(mode, level = null) {
 async function tryUpdatePermissions() {
   try {
     showStatus('Requesting permissions...', 'info');
-    
+
     const response = await invoke('update_permissions');
-    
+
     if (response.success) {
       showStatus('✓ Permissions granted!', 'success');
       elements.permissionHelper.style.display = 'none';

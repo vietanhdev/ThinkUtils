@@ -4,23 +4,25 @@ import { setState, getState } from '../state.js';
 
 export async function startMonitoring() {
   await updateMonitorData();
-  
+
   const interval = getState('monitorInterval');
-  if (interval) clearInterval(interval);
-  
+  if (interval) {
+    clearInterval(interval);
+  }
+
   const newInterval = setInterval(async () => {
     if (getState('currentView') === 'monitor') {
       await updateMonitorData();
     }
   }, 2000);
-  
+
   setState('monitorInterval', newInterval);
 }
 
 async function updateMonitorData() {
   try {
     const response = await invoke('get_system_monitor');
-    
+
     if (response.success && response.data) {
       displayCpuMonitor(response.data.cpu);
       displayMemoryMonitor(response.data.memory);
@@ -37,15 +39,15 @@ function displayCpuMonitor(cpu) {
   const totalUsage = cpu.usage_percent.toFixed(1);
   document.getElementById('cpu-usage-total').textContent = totalUsage + '%';
   document.getElementById('cpu-usage-bar').style.width = totalUsage + '%';
-  
+
   const loadAvg = cpu.load_avg;
-  document.getElementById('load-avg').textContent = 
+  document.getElementById('load-avg').textContent =
     `${loadAvg.one_min.toFixed(2)} / ${loadAvg.five_min.toFixed(2)} / ${loadAvg.fifteen_min.toFixed(2)}`;
-  
+
   const coresContainer = document.getElementById('cpu-cores');
   coresContainer.innerHTML = '';
-  
-  cpu.cores.forEach(core => {
+
+  cpu.cores.forEach((core) => {
     const coreDiv = document.createElement('div');
     coreDiv.className = 'cpu-core-item';
     coreDiv.innerHTML = `
@@ -66,21 +68,20 @@ function displayMemoryMonitor(memory) {
   const usagePercent = memory.usage_percent.toFixed(1);
   document.getElementById('memory-usage-total').textContent = usagePercent + '%';
   document.getElementById('memory-usage-bar').style.width = usagePercent + '%';
-  
+
   const usedGB = (memory.used / 1024 / 1024).toFixed(1);
   const availableGB = (memory.available / 1024 / 1024).toFixed(1);
   const totalGB = (memory.total / 1024 / 1024).toFixed(1);
-  
+
   document.getElementById('memory-used').textContent = usedGB + ' GB';
   document.getElementById('memory-available').textContent = availableGB + ' GB';
   document.getElementById('memory-total').textContent = totalGB + ' GB';
-  
+
   const swapUsedMB = (memory.swap_used / 1024).toFixed(0);
   const swapTotalMB = (memory.swap_total / 1024).toFixed(0);
-  const swapPercent = memory.swap_total > 0 
-    ? ((memory.swap_used / memory.swap_total) * 100).toFixed(1)
-    : 0;
-  
+  const swapPercent =
+    memory.swap_total > 0 ? ((memory.swap_used / memory.swap_total) * 100).toFixed(1) : 0;
+
   document.getElementById('swap-usage').textContent = `${swapUsedMB} MB / ${swapTotalMB} MB`;
   document.getElementById('swap-usage-bar').style.width = swapPercent + '%';
 }
@@ -88,11 +89,11 @@ function displayMemoryMonitor(memory) {
 function displayDiskMonitor(disks) {
   const container = document.getElementById('disk-list');
   container.innerHTML = '';
-  
-  disks.forEach(disk => {
+
+  disks.forEach((disk) => {
     const totalGB = (disk.total / 1024 / 1024 / 1024).toFixed(1);
     const usedGB = (disk.used / 1024 / 1024 / 1024).toFixed(1);
-    
+
     const diskDiv = document.createElement('div');
     diskDiv.className = 'disk-item';
     diskDiv.innerHTML = `
@@ -115,11 +116,11 @@ function displayDiskMonitor(disks) {
 function displayNetworkMonitor(interfaces) {
   const container = document.getElementById('network-list');
   container.innerHTML = '';
-  
-  interfaces.forEach(iface => {
+
+  interfaces.forEach((iface) => {
     const rxMB = (iface.rx_bytes / 1024 / 1024).toFixed(2);
     const txMB = (iface.tx_bytes / 1024 / 1024).toFixed(2);
-    
+
     const ifaceDiv = document.createElement('div');
     ifaceDiv.className = 'network-item';
     ifaceDiv.innerHTML = `
@@ -154,8 +155,8 @@ function displayNetworkMonitor(interfaces) {
 function displayProcessMonitor(processes) {
   const container = document.getElementById('process-list');
   container.innerHTML = '';
-  
-  processes.forEach(proc => {
+
+  processes.forEach((proc) => {
     const procDiv = document.createElement('div');
     procDiv.className = 'process-row';
     procDiv.innerHTML = `

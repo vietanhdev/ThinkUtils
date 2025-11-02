@@ -5,7 +5,7 @@ export function initializeElements() {
   // Page header
   elements.pageTitle = document.getElementById('page-title');
   elements.pageSubtitle = document.getElementById('page-subtitle');
-  
+
   // Fan control
   elements.tempMetrics = document.getElementById('temp-metrics');
   elements.fanMetrics = document.getElementById('fan-metrics');
@@ -23,7 +23,7 @@ export function initializeElements() {
   elements.closeAbout = document.getElementById('close-about');
   elements.permissionHelper = document.getElementById('permission-helper');
   elements.btnGrantPermissions = document.getElementById('btn-grant-permissions');
-  
+
   // Views
   elements.homeView = document.getElementById('home-view');
   elements.fanView = document.getElementById('fan-view');
@@ -32,7 +32,7 @@ export function initializeElements() {
   elements.batteryView = document.getElementById('battery-view');
   elements.performanceView = document.getElementById('performance-view');
   elements.monitorView = document.getElementById('monitor-view');
-  
+
   // Sync
   elements.btnGoogleLogin = document.getElementById('btn-google-login');
   elements.btnGoogleLogout = document.getElementById('btn-google-logout');
@@ -40,7 +40,7 @@ export function initializeElements() {
   elements.btnDownloadSettings = document.getElementById('btn-download-settings');
   elements.syncLogin = document.getElementById('sync-login');
   elements.syncDashboard = document.getElementById('sync-dashboard');
-  
+
   // Battery
   elements.thresholdStart = document.getElementById('threshold-start');
   elements.thresholdStop = document.getElementById('threshold-stop');

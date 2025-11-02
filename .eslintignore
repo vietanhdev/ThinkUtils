@@ -1,0 +1,7 @@
+node_modules/
+dist/
+build/
+target/
+src-tauri/
+*.backup.js
+*.min.js

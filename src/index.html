@@ -20,18 +20,26 @@
       <div class="titlebar-buttons">
         <button class="titlebar-button" id="minimize-btn">
           <svg width="12" height="12" viewBox="0 0 12 12">
-            <line x1="0" y1="6" x2="12" y2="6" stroke="currentColor" stroke-width="1"/>
+            <line x1="0" y1="6" x2="12" y2="6" stroke="currentColor" stroke-width="1" />
           </svg>
         </button>
         <button class="titlebar-button" id="maximize-btn">
           <svg width="12" height="12" viewBox="0 0 12 12">
-            <rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1"/>
+            <rect
+              x="1"
+              y="1"
+              width="10"
+              height="10"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1"
+            />
           </svg>
         </button>
         <button class="titlebar-button close-btn" id="close-btn">
           <svg width="12" height="12" viewBox="0 0 12 12">
-            <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" stroke-width="1"/>
-            <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" stroke-width="1"/>
+            <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" stroke-width="1" />
+            <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" stroke-width="1" />
           </svg>
         </button>
       </div>
@@ -42,67 +50,119 @@
       <aside class="sidebar-nav">
         <div class="sidebar-logo">
           <div class="logo-icon">
-            <img src="assets/logo.svg" width="24" height="24" alt="ThinkUtils Logo">
+            <img src="assets/logo.svg" width="24" height="24" alt="ThinkUtils Logo" />
           </div>
         </div>
-        
+
         <nav class="sidebar-menu">
           <a href="#" class="menu-item active" data-feature="home">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-              <polyline points="9 22 9 12 15 12 15 22"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
             </svg>
             <span>Home</span>
           </a>
 
           <a href="#" class="menu-item" data-feature="fan">
-            <img src="icons/fan.svg" width="20" height="20" alt="Fan" style="filter: brightness(0) saturate(100%) invert(100%);">
+            <img
+              src="icons/fan.svg"
+              width="20"
+              height="20"
+              alt="Fan"
+              style="filter: brightness(0) saturate(100%) invert(100%)"
+            />
             <span>Fan Control</span>
           </a>
 
           <a href="#" class="menu-item" data-feature="battery">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="1" y="6" width="18" height="12" rx="2" ry="2"/>
-              <line x1="23" y1="13" x2="23" y2="11"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="1" y="6" width="18" height="12" rx="2" ry="2" />
+              <line x1="23" y1="13" x2="23" y2="11" />
             </svg>
             <span>Battery</span>
           </a>
 
           <a href="#" class="menu-item" data-feature="performance">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
-              <rect x="9" y="9" width="6" height="6"/>
-              <line x1="9" y1="1" x2="9" y2="4"/>
-              <line x1="15" y1="1" x2="15" y2="4"/>
-              <line x1="9" y1="20" x2="9" y2="23"/>
-              <line x1="15" y1="20" x2="15" y2="23"/>
-              <line x1="20" y1="9" x2="23" y2="9"/>
-              <line x1="20" y1="14" x2="23" y2="14"/>
-              <line x1="1" y1="9" x2="4" y2="9"/>
-              <line x1="1" y1="14" x2="4" y2="14"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+              <rect x="9" y="9" width="6" height="6" />
+              <line x1="9" y1="1" x2="9" y2="4" />
+              <line x1="15" y1="1" x2="15" y2="4" />
+              <line x1="9" y1="20" x2="9" y2="23" />
+              <line x1="15" y1="20" x2="15" y2="23" />
+              <line x1="20" y1="9" x2="23" y2="9" />
+              <line x1="20" y1="14" x2="23" y2="14" />
+              <line x1="1" y1="9" x2="4" y2="9" />
+              <line x1="1" y1="14" x2="4" y2="14" />
             </svg>
             <span>Performance</span>
           </a>
 
           <a href="#" class="menu-item" data-feature="monitor">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
             </svg>
             <span>Monitor</span>
           </a>
 
           <a href="#" class="menu-item" data-feature="system">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="2" y1="12" x2="22" y2="12"/>
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="2" y1="12" x2="22" y2="12" />
+              <path
+                d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+              />
             </svg>
             <span>System Info</span>
           </a>
 
           <a href="#" class="menu-item" data-feature="sync">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"
+              />
             </svg>
             <span>Sync</span>
           </a>
@@ -110,10 +170,17 @@
 
         <div class="sidebar-footer">
           <a href="#" id="about-link" class="menu-item-footer">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="16" x2="12" y2="12"/>
-              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
             <span>About</span>
           </a>
@@ -121,28 +188,35 @@
       </aside>
 
       <!-- About Dialog -->
-      <div id="about-dialog" class="dialog-overlay" style="display: none;">
+      <div id="about-dialog" class="dialog-overlay" style="display: none">
         <div class="dialog-container">
           <div class="dialog-header">
             <div class="dialog-logo">
-              <img src="assets/logo.svg" width="48" height="48" alt="ThinkUtils Logo">
+              <img src="assets/logo.svg" width="48" height="48" alt="ThinkUtils Logo" />
             </div>
             <h2>ThinkUtils</h2>
             <p class="dialog-version">Version 0.1.2</p>
             <button id="close-about" class="dialog-close">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"/>
-                <line x1="6" y1="6" x2="18" y2="18"/>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
           </div>
           <div class="dialog-content">
             <p class="dialog-description">
-              A modern desktop application for ThinkPad users on Linux. 
-              Control your laptop's fan, monitor system resources, manage battery health, 
-              and optimize performance—all in one beautiful interface.
+              A modern desktop application for ThinkPad users on Linux. Control your laptop's fan,
+              monitor system resources, manage battery health, and optimize performance—all in one
+              beautiful interface.
             </p>
-            
+
             <div class="dialog-section">
               <h3>Built With</h3>
               <div class="dialog-tech-stack">
@@ -158,17 +232,26 @@
               <div class="dialog-links">
                 <a href="#" class="dialog-link" id="link-github">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    <path
+                      d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                    />
                   </svg>
                   GitHub Repository
                 </a>
                 <div class="dialog-link-static">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                    <line x1="16" y1="13" x2="8" y2="13"/>
-                    <line x1="16" y1="17" x2="8" y2="17"/>
-                    <polyline points="10 9 9 9 8 9"/>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
                   </svg>
                   <div>
                     <div>Dual Licensed</div>
@@ -176,9 +259,16 @@
                   </div>
                 </div>
                 <a href="#" class="dialog-link" id="link-docs">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
                   </svg>
                   Documentation
                 </a>
@@ -187,13 +277,13 @@
 
             <div class="dialog-section">
               <h3>Credits</h3>
-              <p class="dialog-credits">
-                Made with ❤️ for ThinkPad enthusiasts
-              </p>
+              <p class="dialog-credits">Made with ❤️ for ThinkPad enthusiasts</p>
             </div>
 
             <div class="dialog-footer">
-              <p class="dialog-copyright">© 2024-2025 Viet-Anh Nguyen. Dual Licensed: LGPL v3 / Commercial.</p>
+              <p class="dialog-copyright">
+                © 2024-2025 Viet-Anh Nguyen. Dual Licensed: LGPL v3 / Commercial.
+              </p>
             </div>
           </div>
         </div>
@@ -222,9 +312,16 @@
               <div class="home-overview-compact">
                 <div class="home-compact-item">
                   <div class="compact-icon cpu">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
-                      <rect x="9" y="9" width="6" height="6"/>
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+                      <rect x="9" y="9" width="6" height="6" />
                     </svg>
                   </div>
                   <div class="compact-info">
@@ -233,11 +330,20 @@
                   </div>
                   <span class="compact-detail" id="home-cpu-temp">--°C</span>
                 </div>
-                
+
                 <div class="home-compact-item">
                   <div class="compact-icon memory">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0l1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/>
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0l1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"
+                      />
                     </svg>
                   </div>
                   <div class="compact-info">
@@ -246,12 +352,21 @@
                   </div>
                   <span class="compact-detail" id="home-memory-used">-- GB</span>
                 </div>
-                
+
                 <div class="home-compact-item">
                   <div class="compact-icon fan">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <circle cx="12" cy="12" r="3"/>
-                      <path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <circle cx="12" cy="12" r="3" />
+                      <path
+                        d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"
+                      />
                     </svg>
                   </div>
                   <div class="compact-info">
@@ -260,12 +375,19 @@
                   </div>
                   <span class="compact-detail" id="home-fan-mode">Auto</span>
                 </div>
-                
+
                 <div class="home-compact-item">
                   <div class="compact-icon battery">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <rect x="1" y="6" width="18" height="12" rx="2" ry="2"/>
-                      <line x1="23" y1="13" x2="23" y2="11"/>
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <rect x="1" y="6" width="18" height="12" rx="2" ry="2" />
+                      <line x1="23" y1="13" x2="23" y2="11" />
                     </svg>
                   </div>
                   <div class="compact-info">
@@ -285,8 +407,15 @@
                 <div class="home-setting-card">
                   <div class="home-setting-header">
                     <div class="home-setting-icon">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                       </svg>
                     </div>
                     <div class="home-setting-info">
@@ -311,9 +440,16 @@
                 <div class="home-setting-card">
                   <div class="home-setting-header">
                     <div class="home-setting-icon">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
-                        <rect x="9" y="9" width="6" height="6"/>
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+                        <rect x="9" y="9" width="6" height="6" />
                       </svg>
                     </div>
                     <div class="home-setting-info">
@@ -335,9 +471,16 @@
                 <div class="home-setting-card">
                   <div class="home-setting-header">
                     <div class="home-setting-icon">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/>
-                        <path d="M12 6v6l4 2"/>
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 6v6l4 2" />
                       </svg>
                     </div>
                     <div class="home-setting-info">
@@ -349,7 +492,7 @@
                     <label class="home-toggle-label">
                       <span>Enable CPU turbo frequencies</span>
                       <div class="toggle-switch-small">
-                        <input type="checkbox" id="home-turbo-toggle" checked>
+                        <input type="checkbox" id="home-turbo-toggle" checked />
                         <span class="toggle-slider-small"></span>
                       </div>
                     </label>
@@ -360,9 +503,16 @@
                 <div class="home-setting-card">
                   <div class="home-setting-header">
                     <div class="home-setting-icon">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="1" y="6" width="18" height="12" rx="2" ry="2"/>
-                        <line x1="23" y1="13" x2="23" y2="11"/>
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <rect x="1" y="6" width="18" height="12" rx="2" ry="2" />
+                        <line x1="23" y1="13" x2="23" y2="11" />
                       </svg>
                     </div>
                     <div class="home-setting-info">
@@ -380,7 +530,7 @@
         </div>
 
         <!-- Fan Control View -->
-        <div class="content-view" id="fan-view" style="display: none;">
+        <div class="content-view" id="fan-view" style="display: none">
           <div class="fan-control-layout">
             <!-- Left Column: Status & Monitoring -->
             <div class="fan-status-section">
@@ -394,8 +544,15 @@
                 <div class="status-section">
                   <div class="status-section-header">
                     <div class="status-icon temp">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
                       </svg>
                     </div>
                     <h4>Temperature</h4>
@@ -407,9 +564,18 @@
                 <div class="status-section">
                   <div class="status-section-header">
                     <div class="status-icon fan">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <circle cx="12" cy="12" r="3" />
+                        <path
+                          d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"
+                        />
                       </svg>
                     </div>
                     <h4>Fan</h4>
@@ -418,11 +584,18 @@
                 </div>
 
                 <!-- Permission Helper -->
-                <div id="permission-helper" class="fan-permission-banner" style="display: none;">
+                <div id="permission-helper" class="fan-permission-banner" style="display: none">
                   <div class="permission-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <circle cx="12" cy="12" r="10"/>
-                      <path d="M12 16v-4m0-4h.01"/>
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 16v-4m0-4h.01" />
                     </svg>
                   </div>
                   <div class="permission-content">
@@ -445,9 +618,16 @@
                 <div class="fan-mode-list">
                   <button class="fan-mode-option active" id="btn-auto" data-mode="auto">
                     <div class="mode-option-icon">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M12 1v6m0 6v6"/>
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M12 1v6m0 6v6" />
                       </svg>
                     </div>
                     <div class="mode-option-content">
@@ -455,16 +635,30 @@
                       <p>System controlled cooling</p>
                     </div>
                     <div class="mode-option-check">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <polyline points="20 6 9 17 4 12"/>
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
                       </svg>
                     </div>
                   </button>
 
                   <button class="fan-mode-option" id="btn-manual" data-mode="manual">
                     <div class="mode-option-icon">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                       </svg>
                     </div>
                     <div class="mode-option-content">
@@ -472,16 +666,30 @@
                       <p>Set custom fan speed</p>
                     </div>
                     <div class="mode-option-check">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <polyline points="20 6 9 17 4 12"/>
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
                       </svg>
                     </div>
                   </button>
 
                   <button class="fan-mode-option" id="btn-full" data-mode="full">
                     <div class="mode-option-icon">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                       </svg>
                     </div>
                     <div class="mode-option-content">
@@ -489,24 +697,39 @@
                       <p>Full speed cooling</p>
                     </div>
                     <div class="mode-option-check">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <polyline points="20 6 9 17 4 12"/>
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
                       </svg>
                     </div>
                   </button>
                 </div>
 
                 <!-- Manual Control Slider -->
-                <div class="fan-slider-section" id="slider-section" style="display: none;">
+                <div class="fan-slider-section" id="slider-section" style="display: none">
                   <div class="fan-slider-header">
                     <span class="fan-slider-label">Speed Level</span>
                     <span class="fan-slider-value" id="slider-value">0</span>
                   </div>
                   <div class="fan-slider-wrapper">
-                    <input type="range" id="fan-slider" class="fan-speed-slider" min="0" max="7" value="0" step="1" />
+                    <input
+                      type="range"
+                      id="fan-slider"
+                      class="fan-speed-slider"
+                      min="0"
+                      max="7"
+                      value="0"
+                      step="1"
+                    />
                     <div class="fan-slider-marks">
-                      <span>0</span><span>1</span><span>2</span><span>3</span>
-                      <span>4</span><span>5</span><span>6</span><span>7</span>
+                      <span>0</span><span>1</span><span>2</span><span>3</span> <span>4</span
+                      ><span>5</span><span>6</span><span>7</span>
                     </div>
                   </div>
                 </div>
@@ -519,7 +742,7 @@
         </div>
 
         <!-- Sync View -->
-        <div class="feature-view" id="sync-view" style="display: none;">
+        <div class="feature-view" id="sync-view" style="display: none">
           <div class="view-header">
             <h2>Google Drive Sync</h2>
             <p class="view-subtitle">Sync your settings across devices with Google Drive</p>
@@ -529,32 +752,60 @@
             <!-- Not Logged In -->
             <div id="sync-login" class="sync-section">
               <div class="sync-card">
-                <svg class="sync-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                <svg
+                  class="sync-icon"
+                  width="48"
+                  height="48"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"
+                  />
                 </svg>
                 <h3>Connect Your Google Account</h3>
                 <p>Sync your ThinkUtils settings to Google Drive and access them from any device</p>
                 <button id="btn-google-login" class="btn-large btn-primary">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    <path
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                    />
+                    <path
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                    />
                   </svg>
                   Sign in with Google
                 </button>
-                <p class="sync-note">Note: You need to configure Google OAuth credentials in the source code. See README for instructions.</p>
+                <p class="sync-note">
+                  Note: You need to configure Google OAuth credentials in the source code. See
+                  README for instructions.
+                </p>
               </div>
             </div>
 
             <!-- Logged In -->
-            <div id="sync-dashboard" class="sync-section" style="display: none;">
+            <div id="sync-dashboard" class="sync-section" style="display: none">
               <div class="sync-status-card">
                 <div class="sync-status-header">
                   <div class="user-avatar">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                      <circle cx="12" cy="7" r="4"/>
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
                     </svg>
                   </div>
                   <div class="user-info">
@@ -566,16 +817,32 @@
 
                 <div class="sync-actions">
                   <button id="btn-sync-now" class="btn-secondary">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"
+                      />
                     </svg>
                     Sync Now
                   </button>
                   <button id="btn-download-settings" class="btn-secondary">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                      <polyline points="7 10 12 15 17 10"/>
-                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
                     Download Settings
                   </button>
@@ -602,7 +869,7 @@
         </div>
 
         <!-- System Info View -->
-        <div class="feature-view" id="system-view" style="display: none;">
+        <div class="feature-view" id="system-view" style="display: none">
           <div class="view-header">
             <h2>System Information</h2>
             <p class="view-subtitle">Your ThinkPad details</p>
@@ -611,10 +878,17 @@
           <div class="system-grid">
             <div class="info-card">
               <div class="info-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                  <line x1="8" y1="21" x2="16" y2="21"/>
-                  <line x1="12" y1="17" x2="12" y2="21"/>
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                  <line x1="8" y1="21" x2="16" y2="21" />
+                  <line x1="12" y1="17" x2="12" y2="21" />
                 </svg>
               </div>
               <div class="info-content">
@@ -625,17 +899,24 @@
 
             <div class="info-card">
               <div class="info-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
-                  <rect x="9" y="9" width="6" height="6"/>
-                  <line x1="9" y1="1" x2="9" y2="4"/>
-                  <line x1="15" y1="1" x2="15" y2="4"/>
-                  <line x1="9" y1="20" x2="9" y2="23"/>
-                  <line x1="15" y1="20" x2="15" y2="23"/>
-                  <line x1="20" y1="9" x2="23" y2="9"/>
-                  <line x1="20" y1="14" x2="23" y2="14"/>
-                  <line x1="1" y1="9" x2="4" y2="9"/>
-                  <line x1="1" y1="14" x2="4" y2="14"/>
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+                  <rect x="9" y="9" width="6" height="6" />
+                  <line x1="9" y1="1" x2="9" y2="4" />
+                  <line x1="15" y1="1" x2="15" y2="4" />
+                  <line x1="9" y1="20" x2="9" y2="23" />
+                  <line x1="15" y1="20" x2="15" y2="23" />
+                  <line x1="20" y1="9" x2="23" y2="9" />
+                  <line x1="20" y1="14" x2="23" y2="14" />
+                  <line x1="1" y1="9" x2="4" y2="9" />
+                  <line x1="1" y1="14" x2="4" y2="14" />
                 </svg>
               </div>
               <div class="info-content">
@@ -646,8 +927,17 @@
 
             <div class="info-card">
               <div class="info-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0l1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/>
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0l1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"
+                  />
                 </svg>
               </div>
               <div class="info-content">
@@ -658,10 +948,19 @@
 
             <div class="info-card">
               <div class="info-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="2" y1="12" x2="22" y2="12"/>
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <path
+                    d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+                  />
                 </svg>
               </div>
               <div class="info-content">
@@ -672,8 +971,15 @@
 
             <div class="info-card">
               <div class="info-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                 </svg>
               </div>
               <div class="info-content">
@@ -684,9 +990,18 @@
 
             <div class="info-card">
               <div class="info-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                  <polyline points="22,6 12,13 2,6"/>
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
+                  />
+                  <polyline points="22,6 12,13 2,6" />
                 </svg>
               </div>
               <div class="info-content">
@@ -698,7 +1013,7 @@
         </div>
 
         <!-- Battery View -->
-        <div class="feature-view" id="battery-view" style="display: none;">
+        <div class="feature-view" id="battery-view" style="display: none">
           <div class="view-header">
             <h2>Battery Management</h2>
             <p class="view-subtitle">Monitor and optimize battery health</p>
@@ -714,23 +1029,39 @@
               <div class="threshold-card">
                 <div class="threshold-card-header">
                   <div class="threshold-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <rect x="1" y="6" width="18" height="12" rx="2" ry="2"/>
-                      <line x1="23" y1="13" x2="23" y2="11"/>
-                      <line x1="6" y1="12" x2="14" y2="12"/>
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <rect x="1" y="6" width="18" height="12" rx="2" ry="2" />
+                      <line x1="23" y1="13" x2="23" y2="11" />
+                      <line x1="6" y1="12" x2="14" y2="12" />
                     </svg>
                   </div>
                   <div class="threshold-header-text">
                     <h3>Charge Thresholds</h3>
-                    <p class="threshold-description">Extend battery lifespan with smart charging limits</p>
+                    <p class="threshold-description">
+                      Extend battery lifespan with smart charging limits
+                    </p>
                   </div>
                 </div>
-                
+
                 <div class="threshold-info-banner">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="12" y1="16" x2="12" y2="12"/>
-                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
                   </svg>
                   <span>Recommended: 40-80% for optimal battery longevity</span>
                 </div>
@@ -742,7 +1073,15 @@
                       <span id="threshold-start-value" class="threshold-value">40%</span>
                     </div>
                     <div class="threshold-slider-wrapper">
-                      <input type="range" id="threshold-start" min="0" max="95" value="40" step="5" class="threshold-slider" />
+                      <input
+                        type="range"
+                        id="threshold-start"
+                        min="0"
+                        max="95"
+                        value="40"
+                        step="5"
+                        class="threshold-slider"
+                      />
                       <div class="threshold-marks">
                         <span>0%</span>
                         <span>25%</span>
@@ -759,7 +1098,15 @@
                       <span id="threshold-stop-value" class="threshold-value">80%</span>
                     </div>
                     <div class="threshold-slider-wrapper">
-                      <input type="range" id="threshold-stop" min="50" max="100" value="80" step="5" class="threshold-slider" />
+                      <input
+                        type="range"
+                        id="threshold-stop"
+                        min="50"
+                        max="100"
+                        value="80"
+                        step="5"
+                        class="threshold-slider"
+                      />
                       <div class="threshold-marks">
                         <span>50%</span>
                         <span>65%</span>
@@ -772,14 +1119,30 @@
 
                   <div class="threshold-actions">
                     <button id="btn-apply-thresholds" class="btn-large btn-primary">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="20 6 9 17 4 12"/>
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
                       </svg>
                       Apply Thresholds
                     </button>
                     <button id="btn-reset-thresholds" class="btn-large btn-secondary">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <path
+                          d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"
+                        />
                       </svg>
                       Reset to Default
                     </button>
@@ -790,41 +1153,83 @@
               <!-- Battery Tips Card -->
               <div class="battery-tips-card">
                 <div class="tips-header">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
                   </svg>
                   <h4>Battery Care Tips</h4>
                 </div>
                 <ul class="tips-list">
                   <li>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="20 6 9 17 4 12"/>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
                     </svg>
                     <span>Keep charge between 40-80% for daily use</span>
                   </li>
                   <li>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="20 6 9 17 4 12"/>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
                     </svg>
                     <span>Avoid extreme temperatures (below 0°C or above 45°C)</span>
                   </li>
                   <li>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="20 6 9 17 4 12"/>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
                     </svg>
                     <span>Calibrate battery every 2-3 months (0-100% cycle)</span>
                   </li>
                   <li>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="20 6 9 17 4 12"/>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
                     </svg>
                     <span>Store at 50% charge if not using for extended periods</span>
                   </li>
                   <li>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="20 6 9 17 4 12"/>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
                     </svg>
                     <span>Unplug when fully charged to reduce wear</span>
                   </li>
@@ -835,7 +1240,7 @@
         </div>
 
         <!-- Performance View -->
-        <div class="feature-view" id="performance-view" style="display: none;">
+        <div class="feature-view" id="performance-view" style="display: none">
           <div class="view-header">
             <h2>Performance Tuning</h2>
             <p class="view-subtitle">Optimize CPU and power settings</p>
@@ -883,7 +1288,7 @@
                 <div class="turbo-toggle-wrapper">
                   <span class="turbo-label">Turbo Boost</span>
                   <label class="toggle-switch">
-                    <input type="checkbox" id="turbo-toggle">
+                    <input type="checkbox" id="turbo-toggle" />
                     <span class="toggle-slider"></span>
                   </label>
                   <span id="turbo-status-text" class="turbo-status-text">Loading...</span>
@@ -894,7 +1299,7 @@
         </div>
 
         <!-- Monitor View -->
-        <div class="feature-view" id="monitor-view" style="display: none;">
+        <div class="feature-view" id="monitor-view" style="display: none">
           <div class="view-header">
             <h2>System Monitor</h2>
             <p class="view-subtitle">Real-time system resource monitoring</p>
@@ -948,7 +1353,11 @@
                   <span id="swap-usage">0 MB / 0 MB</span>
                 </div>
                 <div class="monitor-progress">
-                  <div id="swap-usage-bar" class="monitor-progress-bar swap" style="width: 0%"></div>
+                  <div
+                    id="swap-usage-bar"
+                    class="monitor-progress-bar swap"
+                    style="width: 0%"
+                  ></div>
                 </div>
               </div>
             </div>
@@ -987,7 +1396,6 @@
             </div>
           </div>
         </div>
-
       </main>
     </div>
   </body>

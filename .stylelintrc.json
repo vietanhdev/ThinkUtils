@@ -1,0 +1,9 @@
+{
+  "extends": "stylelint-config-standard",
+  "rules": {
+    "no-descending-specificity": null,
+    "keyframes-name-pattern": null,
+    "selector-class-pattern": null,
+    "custom-property-pattern": null
+  }
+}

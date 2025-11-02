@@ -16,14 +16,14 @@ const isModularHTML = document.getElementById('titlebar-container') !== null;
 
 async function initializeApp() {
   console.log('[ThinkUtils] Initializing...');
-  
+
   // If using modular HTML, load templates first
   if (isModularHTML) {
     const { loadTemplates, injectTemplates } = await import('./templateLoader.js');
     const templates = await loadTemplates();
     injectTemplates(templates);
   }
-  
+
   initializeElements();
   setupTitlebar();
   setupFeatureNavigation();
@@ -34,18 +34,18 @@ async function initializeApp() {
   setupAboutDialog();
   checkInitialPermissions();
   startAutoUpdate();
-  
+
   // Update home view periodically
   setInterval(() => {
     if (state.currentView === 'home') {
       updateHomeView();
     }
   }, 2000);
-  
+
   console.log('[ThinkUtils] Ready');
 }
 
-window.addEventListener("DOMContentLoaded", initializeApp);
+window.addEventListener('DOMContentLoaded', initializeApp);
 
 window.addEventListener('beforeunload', () => {
   if (state.updateInterval) {

@@ -1,0 +1,19 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "🔍 Running pre-commit checks..."
+echo ""
+
+# Run lint-staged to format and lint only staged files
+echo "📝 Formatting and linting staged files..."
+npx lint-staged
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ Linting failed. Please fix the issues and try again."
+  exit 1
+fi
+
+echo ""
+echo "✅ All checks passed!"
+echo ""

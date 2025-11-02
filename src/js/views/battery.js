@@ -25,7 +25,7 @@ export async function loadBatteryInfo() {
     if (response.success && response.data) {
       displayBatteries(response.data);
     }
-    
+
     const thresholdResponse = await invoke('get_battery_thresholds');
     if (thresholdResponse.success && thresholdResponse.data) {
       elements.thresholdStart.value = thresholdResponse.data.start;
@@ -41,8 +41,8 @@ export async function loadBatteryInfo() {
 function displayBatteries(batteries) {
   const container = document.getElementById('battery-cards');
   container.innerHTML = '';
-  
-  batteries.forEach(battery => {
+
+  batteries.forEach((battery) => {
     const card = document.createElement('div');
     card.className = 'battery-card';
     card.innerHTML = `
@@ -77,11 +77,11 @@ function displayBatteries(batteries) {
 async function applyBatteryThresholds() {
   const start = parseInt(elements.thresholdStart.value);
   const stop = parseInt(elements.thresholdStop.value);
-  
+
   try {
     showStatus('Setting battery thresholds...', 'info');
     const response = await invoke('set_battery_thresholds', { start, stop });
-    
+
     if (response.success) {
       showStatus(`✓ Thresholds set: ${start}%-${stop}%`, 'success');
     } else {

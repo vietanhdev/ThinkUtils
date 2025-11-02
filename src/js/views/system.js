@@ -4,7 +4,7 @@ const { invoke } = window.__TAURI__.core;
 export async function loadSystemInfo() {
   try {
     const response = await invoke('get_system_info');
-    
+
     if (response.success && response.data) {
       const info = response.data;
       document.getElementById('system-model').textContent = info.model;
@@ -16,7 +16,7 @@ export async function loadSystemInfo() {
     }
   } catch (error) {
     console.error('[System] Info load failed:', error);
-    document.querySelectorAll('.info-content p').forEach(p => {
+    document.querySelectorAll('.info-content p').forEach((p) => {
       p.textContent = 'Error loading';
     });
   }
