@@ -53,11 +53,14 @@ jobs:
             echo "version=dev-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           fi
 
-      - name: Rename .deb package
+      - name: Rename packages
         run: |
           cd src-tauri/target/release/bundle/deb
           DEB_FILE=$(ls *.deb | head -n 1)
           mv "$DEB_FILE" "thinkutils_${{ steps.version.outputs.version }}_amd64.deb"
+          cd ../rpm
+          RPM_FILE=$(ls *.rpm | head -n 1)
+          mv "$RPM_FILE" "thinkutils-${{ steps.version.outputs.version }}.x86_64.rpm"
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -65,6 +68,7 @@ jobs:
         with:
           files: |
             src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
             src-tauri/target/release/bundle/appimage/*.AppImage
           draft: false
           prerelease: false
@@ -72,9 +76,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload artifact (non-tag builds)
+      - name: Upload artifacts (non-tag builds)
         if: "!startsWith(github.ref, 'refs/tags/')"
         uses: actions/upload-artifact@v4
         with:
-          name: thinkutils-deb-${{ steps.version.outputs.version }}
-          path: src-tauri/target/release/bundle/deb/*.deb
+          name: thinkutils-packages-${{ steps.version.outputs.version }}
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm

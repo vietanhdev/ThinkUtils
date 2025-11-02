@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "thinkutils",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "identifier": "com.vietanhnv.thinkutils",
   "build": {
     "frontendDist": "../src"
@@ -37,6 +37,9 @@
     ],
     "linux": {
       "deb": {
+        "desktopTemplate": "../thinkutils.desktop"
+      },
+      "rpm": {
         "desktopTemplate": "../thinkutils.desktop"
       }
     }
