@@ -80,6 +80,8 @@ pub async fn set_cpu_governor(governor: String) -> ApiResponse<String> {
         })
         .unwrap_or(1);
     
+    println!("[Performance] Found {} CPU cores", cpu_count);
+    
     // Create script to set governor for all CPUs
     let temp_script = format!("/tmp/set_governor_{}.sh", std::process::id());
     let mut script_content = String::from("#!/bin/bash\nset -e\n");
@@ -92,7 +94,9 @@ pub async fn set_cpu_governor(governor: String) -> ApiResponse<String> {
     }
     script_content.push_str("exit 0\n");
     
-    if let Err(e) = fs::write(&temp_script, script_content) {
+    println!("[Performance] Script content:\n{}", script_content);
+    
+    if let Err(e) = fs::write(&temp_script, &script_content) {
         return ApiResponse {
             success: false,
             data: None,
@@ -107,6 +111,8 @@ pub async fn set_cpu_governor(governor: String) -> ApiResponse<String> {
         let _ = fs::set_permissions(&temp_script, perms);
     }
     
+    println!("[Performance] Executing pkexec...");
+    
     match tokio::process::Command::new("pkexec")
         .arg("bash")
         .arg(&temp_script)
@@ -116,26 +122,41 @@ pub async fn set_cpu_governor(governor: String) -> ApiResponse<String> {
         Ok(output) => {
             let _ = fs::remove_file(&temp_script);
             
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            
+            println!("[Performance] pkexec stdout: {}", stdout);
+            println!("[Performance] pkexec stderr: {}", stderr);
+            println!("[Performance] pkexec status: {}", output.status);
+            
             if output.status.success() {
+                println!("[Performance] Successfully set governor to: {}", governor);
                 ApiResponse {
                     success: true,
                     data: Some(format!("CPU governor set to: {}", governor)),
                     error: None,
                 }
             } else {
+                let error_msg = if !stderr.is_empty() {
+                    stderr.to_string()
+                } else {
+                    "Permission denied or operation failed".to_string()
+                };
+                println!("[Performance] Failed to set governor: {}", error_msg);
                 ApiResponse {
                     success: false,
                     data: None,
-                    error: Some("Permission denied".to_string()),
+                    error: Some(error_msg),
                 }
             }
         }
         Err(e) => {
             let _ = fs::remove_file(&temp_script);
+            println!("[Performance] Failed to execute pkexec: {}", e);
             ApiResponse {
                 success: false,
                 data: None,
-                error: Some(format!("Failed to execute: {}", e)),
+                error: Some(format!("Failed to execute pkexec: {}", e)),
             }
         }
     }

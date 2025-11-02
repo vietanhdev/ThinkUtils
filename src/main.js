@@ -318,7 +318,8 @@ async function updateHomeView() {
         key.toLowerCase().includes('cpu') || key.toLowerCase().includes('core')
       );
       if (cpuTemp) {
-        document.getElementById('home-cpu-temp').textContent = cpuTemp[1];
+        const cpuTempEl = document.getElementById('home-cpu-temp');
+        if (cpuTempEl) cpuTempEl.textContent = cpuTemp[1];
       }
       
       // Update Fan data
@@ -328,17 +329,23 @@ async function updateHomeView() {
         const fanStatus = response.data.fans.status;
         
         if (fanSpeed) {
-          document.getElementById('home-fan-speed').textContent = fanSpeed;
-          const speedValue = parseInt(fanSpeed);
-          document.getElementById('home-fan-bar').style.width = Math.min((speedValue / 6500) * 100, 100) + '%';
+          const fanSpeedEl = document.getElementById('home-fan-speed');
+          const fanBarEl = document.getElementById('home-fan-bar');
+          if (fanSpeedEl) fanSpeedEl.textContent = fanSpeed;
+          if (fanBarEl) {
+            const speedValue = parseInt(fanSpeed);
+            fanBarEl.style.width = Math.min((speedValue / 6500) * 100, 100) + '%';
+          }
         }
         
         if (fanLevel) {
-          document.getElementById('home-fan-level').textContent = `Level ${fanLevel}`;
+          const fanLevelEl = document.getElementById('home-fan-level');
+          if (fanLevelEl) fanLevelEl.textContent = `Level ${fanLevel}`;
         }
         
         if (fanStatus) {
-          document.getElementById('home-fan-mode').textContent = fanStatus;
+          const fanModeEl = document.getElementById('home-fan-mode');
+          if (fanModeEl) fanModeEl.textContent = fanStatus;
         }
       }
     }
@@ -349,25 +356,34 @@ async function updateHomeView() {
   // Update memory info
   try {
     const monitorResponse = await invoke('get_system_monitor');
+    console.log('[Home] Monitor response:', monitorResponse);
     if (monitorResponse.success && monitorResponse.data) {
       const memory = monitorResponse.data.memory;
       if (memory) {
+        console.log('[Home] Memory data:', memory);
         const usagePercent = memory.usage_percent.toFixed(1);
+        // Memory values from backend are in KB, convert to GB
         const totalGB = (memory.total / 1024 / 1024).toFixed(1);
         const usedGB = (memory.used / 1024 / 1024).toFixed(1);
         
-        document.getElementById('home-memory-usage').textContent = usagePercent + '%';
-        document.getElementById('home-memory-total').textContent = totalGB + ' GB';
-        document.getElementById('home-memory-used').textContent = usedGB + ' GB used';
-        document.getElementById('home-memory-bar').style.width = usagePercent + '%';
+        const memUsageEl = document.getElementById('home-memory-usage');
+        const memUsedEl = document.getElementById('home-memory-used');
+        const memBarEl = document.getElementById('home-memory-bar');
+        
+        if (memUsageEl) memUsageEl.textContent = usagePercent + '%';
+        if (memUsedEl) memUsedEl.textContent = usedGB + ' GB used';
+        if (memBarEl) memBarEl.style.width = usagePercent + '%';
       }
       
       const cpu = monitorResponse.data.cpu;
       if (cpu) {
+        console.log('[Home] CPU data:', cpu);
         const cpuUsage = cpu.usage_percent.toFixed(1);
-        document.getElementById('home-cpu-usage').textContent = cpuUsage + '%';
-        // Update CPU bar based on usage
-        document.getElementById('home-cpu-bar').style.width = cpuUsage + '%';
+        const cpuUsageEl = document.getElementById('home-cpu-usage');
+        const cpuBarEl = document.getElementById('home-cpu-bar');
+        
+        if (cpuUsageEl) cpuUsageEl.textContent = cpuUsage + '%';
+        if (cpuBarEl) cpuBarEl.style.width = cpuUsage + '%';
       }
     }
   } catch (error) {
@@ -379,17 +395,24 @@ async function updateHomeView() {
     const batteryResponse = await invoke('get_battery_info');
     if (batteryResponse.success && batteryResponse.data && batteryResponse.data.length > 0) {
       const battery = batteryResponse.data[0];
-      document.getElementById('home-battery-level').textContent = battery.capacity + '%';
-      document.getElementById('home-battery-status').textContent = battery.status;
-      document.getElementById('home-battery-health').textContent = `Health: ${battery.health}%`;
-      document.getElementById('home-battery-bar').style.width = battery.capacity + '%';
+      const battLevelEl = document.getElementById('home-battery-level');
+      const battStatusEl = document.getElementById('home-battery-status');
+      const battHealthEl = document.getElementById('home-battery-health');
+      const battBarEl = document.getElementById('home-battery-bar');
+      
+      if (battLevelEl) battLevelEl.textContent = battery.capacity + '%';
+      if (battStatusEl) battStatusEl.textContent = battery.status;
+      if (battHealthEl) battHealthEl.textContent = `Health: ${battery.health}%`;
+      if (battBarEl) battBarEl.style.width = battery.capacity + '%';
     }
     
     // Update battery threshold display
     const thresholdResponse = await invoke('get_battery_thresholds');
     if (thresholdResponse.success && thresholdResponse.data) {
-      document.getElementById('home-battery-threshold').textContent = 
-        `${thresholdResponse.data.start}% - ${thresholdResponse.data.stop}%`;
+      const thresholdEl = document.getElementById('home-battery-threshold');
+      if (thresholdEl) {
+        thresholdEl.textContent = `${thresholdResponse.data.start}% - ${thresholdResponse.data.stop}%`;
+      }
     }
   } catch (error) {
     console.error('[Home] Battery update failed:', error);
@@ -400,10 +423,15 @@ async function updateHomeView() {
     const systemResponse = await invoke('get_system_info');
     if (systemResponse.success && systemResponse.data) {
       const info = systemResponse.data;
-      document.getElementById('home-system-model').textContent = info.model;
-      document.getElementById('home-system-cpu').textContent = info.cpu;
-      document.getElementById('home-system-memory').textContent = info.memory;
-      document.getElementById('home-system-os').textContent = info.os;
+      const modelEl = document.getElementById('home-system-model');
+      const cpuEl = document.getElementById('home-system-cpu');
+      const memEl = document.getElementById('home-system-memory');
+      const osEl = document.getElementById('home-system-os');
+      
+      if (modelEl) modelEl.textContent = info.model;
+      if (cpuEl) cpuEl.textContent = info.cpu;
+      if (memEl) memEl.textContent = info.memory;
+      if (osEl) osEl.textContent = info.os;
     }
   } catch (error) {
     console.error('[Home] System info update failed:', error);
@@ -413,8 +441,10 @@ async function updateHomeView() {
   try {
     const profileResponse = await invoke('get_power_profile');
     if (profileResponse.success && profileResponse.data) {
-      document.getElementById('home-power-profile').textContent = 
-        profileResponse.data.current.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      const profileEl = document.getElementById('home-power-profile');
+      if (profileEl) {
+        profileEl.textContent = profileResponse.data.current.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      }
       
       // Update active button
       document.querySelectorAll('.home-setting-btn[data-profile]').forEach(btn => {
@@ -432,13 +462,16 @@ async function updateHomeView() {
   try {
     const cpuResponse = await invoke('get_cpu_info');
     if (cpuResponse.success && cpuResponse.data) {
-      document.getElementById('home-cpu-governor').textContent = 
-        cpuResponse.data.governor.charAt(0).toUpperCase() + cpuResponse.data.governor.slice(1);
+      const govEl = document.getElementById('home-cpu-governor');
+      if (govEl) {
+        govEl.textContent = cpuResponse.data.governor.charAt(0).toUpperCase() + cpuResponse.data.governor.slice(1);
+      }
       
       // Update CPU frequency display
       if (cpuResponse.data.current_freq) {
         const freqGHz = (cpuResponse.data.current_freq / 1000).toFixed(2);
-        document.getElementById('home-cpu-freq').textContent = `${freqGHz} GHz`;
+        const freqEl = document.getElementById('home-cpu-freq');
+        if (freqEl) freqEl.textContent = `${freqGHz} GHz`;
       }
       
       // Update active button
@@ -458,7 +491,8 @@ async function updateHomeView() {
     const turboResponse = await invoke('get_turbo_boost_status');
     if (turboResponse.success) {
       const enabled = turboResponse.data;
-      document.getElementById('home-turbo-status').textContent = enabled ? 'Enabled' : 'Disabled';
+      const statusEl = document.getElementById('home-turbo-status');
+      if (statusEl) statusEl.textContent = enabled ? 'Enabled' : 'Disabled';
       const toggle = document.getElementById('home-turbo-toggle');
       if (toggle) {
         toggle.checked = enabled;
@@ -508,19 +542,34 @@ function setupHomeActions() {
   // Setup CPU governor buttons
   const governorBtns = document.querySelectorAll('.home-setting-btn[data-governor]');
   governorBtns.forEach(btn => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', async (e) => {
       const governor = btn.dataset.governor;
+      
+      // Disable all buttons during operation
+      governorBtns.forEach(b => b.disabled = true);
+      
       try {
+        console.log('[Home] Setting CPU governor to:', governor);
         showStatus(`Setting CPU governor to ${governor}...`, 'info');
+        
         const response = await invoke('set_cpu_governor', { governor });
+        console.log('[Home] Governor response:', response);
+        
         if (response.success) {
-          showStatus(`✓ CPU governor: ${governor}`, 'success');
-          updateHomeView();
+          showStatus(`✓ CPU governor set to ${governor}`, 'success');
+          // Wait a bit for the system to update
+          await new Promise(resolve => setTimeout(resolve, 500));
+          await updateHomeView();
         } else {
-          showStatus(`Error: ${response.error}`, 'error');
+          showStatus(`Error: ${response.error || 'Failed to set governor'}`, 'error');
+          console.error('[Home] Governor error:', response.error);
         }
       } catch (error) {
         showStatus(`Error: ${error}`, 'error');
+        console.error('[Home] Governor exception:', error);
+      } finally {
+        // Re-enable buttons
+        governorBtns.forEach(b => b.disabled = false);
       }
     });
   });
@@ -751,24 +800,55 @@ async function tryUpdatePermissions() {
 }
 
 function showStatus(message, type = 'info') {
-  // Try to find the fan status banner first, fallback to regular status message
-  const statusEl = elements.fanStatusBanner || elements.statusMessage;
+  console.log(`[Status] ${type.toUpperCase()}: ${message}`);
   
-  if (statusEl) {
-    statusEl.textContent = message;
-    statusEl.className = statusEl.classList.contains('fan-status-banner') 
-      ? `fan-status-banner ${type}` 
-      : `status-banner ${type}`;
-    statusEl.style.display = 'block';
-    
-    const timeout = type === 'error' ? 10000 : 5000;
-    
-    setTimeout(() => {
-      if (statusEl.textContent === message) {
-        statusEl.style.display = 'none';
-      }
-    }, timeout);
+  // Try to find existing status elements
+  let statusEl = elements.fanStatusBanner || elements.statusMessage;
+  
+  // If no status element exists, create a global one
+  if (!statusEl || statusEl.style.display === 'none') {
+    statusEl = document.getElementById('global-status-banner');
+    if (!statusEl) {
+      statusEl = document.createElement('div');
+      statusEl.id = 'global-status-banner';
+      statusEl.style.cssText = `
+        position: fixed;
+        top: 50px;
+        right: 20px;
+        z-index: 9999;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        max-width: 400px;
+      `;
+      document.body.appendChild(statusEl);
+    }
   }
+  
+  statusEl.textContent = message;
+  
+  // Set colors based on type
+  const colors = {
+    success: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)', text: '#10B981' },
+    error: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.3)', text: '#EF4444' },
+    info: { bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.3)', text: '#3B82F6' }
+  };
+  
+  const color = colors[type] || colors.info;
+  statusEl.style.background = color.bg;
+  statusEl.style.border = `1px solid ${color.border}`;
+  statusEl.style.color = color.text;
+  statusEl.style.display = 'block';
+  
+  const timeout = type === 'error' ? 10000 : 5000;
+  
+  setTimeout(() => {
+    if (statusEl.textContent === message) {
+      statusEl.style.display = 'none';
+    }
+  }, timeout);
 }
 
 function startAutoUpdate() {

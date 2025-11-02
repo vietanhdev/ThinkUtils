@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::process::Command;
+use std::thread;
+use std::time::Duration;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SystemMonitor {
@@ -106,28 +108,33 @@ fn collect_system_stats() -> Result<SystemMonitor, String> {
 }
 
 fn get_cpu_stats() -> Result<CpuStats, String> {
-    let stat = fs::read_to_string("/proc/stat")
+    // Take first snapshot
+    let stat1 = fs::read_to_string("/proc/stat")
         .map_err(|e| format!("Failed to read /proc/stat: {}", e))?;
     
-    let mut total_usage = 0.0;
-    let mut cores = Vec::new();
+    let snapshot1 = parse_cpu_snapshot(&stat1)?;
     
-    for line in stat.lines() {
-        if line.starts_with("cpu") && line.len() > 3 {
-            if let Some(core_id) = line.strip_prefix("cpu") {
-                if let Ok(id) = core_id.split_whitespace().next().unwrap_or("").parse::<usize>() {
-                    let usage = calculate_cpu_usage(line);
-                    let freq = get_core_frequency(id);
-                    cores.push(CoreStats {
-                        core_id: id,
-                        usage_percent: usage,
-                        frequency: freq,
-                    });
-                }
-            }
-        } else if line.starts_with("cpu ") {
-            total_usage = calculate_cpu_usage(line);
-        }
+    // Wait 200ms for measurable difference
+    thread::sleep(Duration::from_millis(200));
+    
+    // Take second snapshot
+    let stat2 = fs::read_to_string("/proc/stat")
+        .map_err(|e| format!("Failed to read /proc/stat: {}", e))?;
+    
+    let snapshot2 = parse_cpu_snapshot(&stat2)?;
+    
+    // Calculate usage from deltas
+    let total_usage = calculate_cpu_usage_from_snapshots(&snapshot1.total, &snapshot2.total);
+    
+    let mut cores = Vec::new();
+    for (i, (core1, core2)) in snapshot1.cores.iter().zip(snapshot2.cores.iter()).enumerate() {
+        let usage = calculate_cpu_usage_from_snapshots(core1, core2);
+        let freq = get_core_frequency(i);
+        cores.push(CoreStats {
+            core_id: i,
+            usage_percent: usage,
+            frequency: freq,
+        });
     }
     
     let load_avg = get_load_average()?;
@@ -139,25 +146,82 @@ fn get_cpu_stats() -> Result<CpuStats, String> {
     })
 }
 
-fn calculate_cpu_usage(line: &str) -> f64 {
+#[derive(Debug)]
+struct CpuSnapshot {
+    total: CpuTimes,
+    cores: Vec<CpuTimes>,
+}
+
+#[derive(Debug)]
+struct CpuTimes {
+    user: u64,
+    nice: u64,
+    system: u64,
+    idle: u64,
+    iowait: u64,
+    irq: u64,
+    softirq: u64,
+    steal: u64,
+}
+
+fn parse_cpu_snapshot(stat: &str) -> Result<CpuSnapshot, String> {
+    let mut total = None;
+    let mut cores = Vec::new();
+    
+    for line in stat.lines() {
+        if line.starts_with("cpu ") {
+            total = Some(parse_cpu_line(line)?);
+        } else if line.starts_with("cpu") && line.len() > 3 {
+            if let Some(core_id) = line.strip_prefix("cpu") {
+                if core_id.split_whitespace().next().unwrap_or("").parse::<usize>().is_ok() {
+                    cores.push(parse_cpu_line(line)?);
+                }
+            }
+        }
+    }
+    
+    Ok(CpuSnapshot {
+        total: total.ok_or("No total CPU line found")?,
+        cores,
+    })
+}
+
+fn parse_cpu_line(line: &str) -> Result<CpuTimes, String> {
     let parts: Vec<&str> = line.split_whitespace().collect();
-    if parts.len() < 5 {
+    if parts.len() < 8 {
+        return Err("Invalid CPU line format".to_string());
+    }
+    
+    Ok(CpuTimes {
+        user: parts[1].parse().unwrap_or(0),
+        nice: parts[2].parse().unwrap_or(0),
+        system: parts[3].parse().unwrap_or(0),
+        idle: parts[4].parse().unwrap_or(0),
+        iowait: parts[5].parse().unwrap_or(0),
+        irq: parts[6].parse().unwrap_or(0),
+        softirq: parts[7].parse().unwrap_or(0),
+        steal: if parts.len() > 8 { parts[8].parse().unwrap_or(0) } else { 0 },
+    })
+}
+
+fn calculate_cpu_usage_from_snapshots(before: &CpuTimes, after: &CpuTimes) -> f64 {
+    let idle_delta = after.idle.saturating_sub(before.idle) + after.iowait.saturating_sub(before.iowait);
+    let total_delta = 
+        after.user.saturating_sub(before.user) +
+        after.nice.saturating_sub(before.nice) +
+        after.system.saturating_sub(before.system) +
+        after.idle.saturating_sub(before.idle) +
+        after.iowait.saturating_sub(before.iowait) +
+        after.irq.saturating_sub(before.irq) +
+        after.softirq.saturating_sub(before.softirq) +
+        after.steal.saturating_sub(before.steal);
+    
+    if total_delta == 0 {
         return 0.0;
     }
     
-    let user: u64 = parts[1].parse().unwrap_or(0);
-    let nice: u64 = parts[2].parse().unwrap_or(0);
-    let system: u64 = parts[3].parse().unwrap_or(0);
-    let idle: u64 = parts[4].parse().unwrap_or(0);
-    
-    let total = user + nice + system + idle;
-    let active = user + nice + system;
-    
-    if total == 0 {
-        return 0.0;
-    }
-    
-    (active as f64 / total as f64) * 100.0
+    let active_delta = total_delta - idle_delta;
+    (active_delta as f64 / total_delta as f64) * 100.0
 }
 
 fn get_core_frequency(core_id: usize) -> u64 {
