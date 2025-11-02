@@ -35,15 +35,20 @@ export async function initFanCurve() {
   // Load saved curve from backend
   await loadCurveFromBackend();
 
-  // Setup event listeners
-  canvas.addEventListener('mousedown', handleMouseDown);
-  canvas.addEventListener('mousemove', handleMouseMove);
-  canvas.addEventListener('mouseup', handleMouseUp);
-  canvas.addEventListener('mouseleave', handleMouseUp);
+  // Setup event listeners (only once)
+  if (!canvas.dataset.initialized) {
+    canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseup', handleMouseUp);
+    canvas.addEventListener('mouseleave', handleMouseUp);
 
-  document.getElementById('btn-reset-curve')?.addEventListener('click', resetCurve);
-  document.getElementById('btn-save-curve')?.addEventListener('click', saveCurve);
+    document.getElementById('btn-reset-curve')?.addEventListener('click', resetCurve);
+    document.getElementById('btn-save-curve')?.addEventListener('click', saveCurve);
 
+    canvas.dataset.initialized = 'true';
+  }
+
+  // Always draw the curve when initializing
   drawCurve();
 }
 
@@ -303,9 +308,18 @@ function handleMouseUp() {
   canvas.style.cursor = 'default';
 }
 
-function resetCurve() {
+async function resetCurve() {
   curvePoints = [...DEFAULT_CURVE];
   drawCurve();
+
+  // Save the reset curve to backend
+  try {
+    await invoke('set_fan_curve', { points: curvePoints });
+    localStorage.setItem('fanCurve', JSON.stringify(curvePoints));
+  } catch (error) {
+    console.error('[Fan Curve] Failed to save reset curve:', error);
+  }
+
   showStatus('Curve reset to default', 'info');
 }
 

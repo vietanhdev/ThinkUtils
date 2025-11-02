@@ -209,10 +209,11 @@ async function setFanMode(mode, level = null) {
       elements.curveSection.style.display = 'block';
 
       // Initialize canvas when curve section becomes visible
-      setTimeout(() => {
-        initFanCurve();
-        startCurveMode();
-      }, 100);
+      // Use requestAnimationFrame to ensure DOM is updated
+      requestAnimationFrame(async () => {
+        await initFanCurve();
+        await startCurveMode();
+      });
 
       // Save to settings
       const { updateSetting: updateSettingCurve } = await import('../settingsManager.js');
