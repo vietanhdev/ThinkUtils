@@ -1,0 +1,84 @@
+/* Sync View Styles */
+
+/* Uses common layout components from layouts.css */
+
+.sync-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
+  /* Uses default max-width from .feature-view (1400px) */
+}
+
+/* Login Card - Centered content */
+.sync-login-card {
+  text-align: center;
+}
+
+.sync-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  background: var(--red-light);
+  border-radius: 50%;
+  margin-bottom: 20px;
+}
+
+.sync-icon svg {
+  stroke: var(--red-primary);
+}
+
+.sync-login-card h3 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.sync-login-card .card-description {
+  margin-bottom: 24px;
+}
+
+/* Dashboard */
+.sync-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* User Info in Card Header */
+.sync-user-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sync-user-info h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.sync-user-info p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* User Avatar - uses card-icon styling */
+.user-avatar {
+  background: var(--red-light);
+}
+
+.user-avatar svg {
+  stroke: var(--red-primary);
+}
+
+/* Responsive Design */
+@media (width <= 768px) {
+  /* Inherits responsive behavior from common.css */
+}

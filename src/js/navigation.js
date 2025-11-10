@@ -7,6 +7,7 @@ import { loadSystemInfo } from './views/system.js';
 import { loadBatteryInfo } from './views/battery.js';
 import { loadPerformanceInfo } from './views/performance.js';
 import { startMonitoring } from './views/monitor.js';
+import { loadSecurityStatus } from './views/security.js';
 
 export function setupFeatureNavigation() {
   const menuItems = document.querySelectorAll('.menu-item');
@@ -57,6 +58,9 @@ export function switchView(view) {
   if (elements.monitorView) {
     elements.monitorView.style.display = 'none';
   }
+  if (elements.securityView) {
+    elements.securityView.style.display = 'none';
+  }
 
   // Update page title
   const titles = {
@@ -66,7 +70,8 @@ export function switchView(view) {
     performance: { title: 'Performance', subtitle: 'Optimize CPU and power settings' },
     monitor: { title: 'System Monitor', subtitle: 'Real-time resource monitoring' },
     system: { title: 'System Info', subtitle: 'Your ThinkPad details' },
-    sync: { title: 'Cloud Sync', subtitle: 'Sync settings across devices' }
+    sync: { title: 'Cloud Sync', subtitle: 'Sync settings across devices' },
+    security: { title: 'Security', subtitle: 'Antivirus protection and security settings' }
   };
 
   if (titles[view] && elements.pageTitle && elements.pageSubtitle) {
@@ -115,6 +120,12 @@ export function switchView(view) {
       if (elements.monitorView) {
         elements.monitorView.style.display = 'block';
         startMonitoring();
+      }
+      break;
+    case 'security':
+      if (elements.securityView) {
+        elements.securityView.style.display = 'block';
+        loadSecurityStatus();
       }
       break;
   }

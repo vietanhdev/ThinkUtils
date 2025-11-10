@@ -1,0 +1,342 @@
+/* Monitor View Styles */
+
+/* Uses common layout components from layouts.css */
+
+.monitor-container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+/* Monitor-specific value display */
+.monitor-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--red-primary);
+  font-family: 'SF Mono', monospace;
+}
+
+/* Monitor details - uses info-list but with custom spacing */
+.monitor-details {
+  margin-bottom: 20px;
+}
+
+/* Swap progress bar color */
+.progress-fill.swap {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+/* CPU Cores */
+.cpu-cores-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.cpu-core-item {
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.cpu-core-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.cpu-core-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.cpu-core-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--red-primary);
+  font-family: 'SF Mono', monospace;
+}
+
+.cpu-core-bar {
+  height: 4px;
+  background: var(--bg-primary);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.cpu-core-bar-fill {
+  height: 100%;
+  background: var(--red-primary);
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+.cpu-core-freq {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  text-align: center;
+  font-family: 'SF Mono', monospace;
+}
+
+/* Swap Info */
+.swap-info {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+}
+
+.swap-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.swap-header span:first-child {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.swap-header span:last-child {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: 'SF Mono', monospace;
+}
+
+/* Disk List */
+.disk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.disk-item {
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+}
+
+.disk-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.disk-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.disk-usage {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--red-primary);
+  font-family: 'SF Mono', monospace;
+}
+
+.disk-progress {
+  height: 6px;
+  background: var(--bg-primary);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.disk-progress-bar {
+  height: 100%;
+  background: var(--red-primary);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.disk-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+
+.disk-device {
+  color: var(--text-tertiary);
+}
+
+.disk-size {
+  color: var(--text-secondary);
+  font-family: 'SF Mono', monospace;
+}
+
+/* Network List */
+.network-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.network-item {
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+}
+
+.network-header {
+  margin-bottom: 8px;
+}
+
+.network-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.network-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.network-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-primary);
+  font-family: 'SF Mono', monospace;
+}
+
+.network-stat svg {
+  stroke: var(--red-primary);
+}
+
+.network-packets {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light);
+}
+
+/* Process Table */
+.process-table {
+  display: flex;
+  flex-direction: column;
+}
+
+.process-table-header {
+  display: grid;
+  grid-template-columns: 80px 1fr 80px 100px 100px;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.process-table-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.process-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 80px 100px 100px;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.process-row:hover {
+  background: var(--bg-primary);
+  transform: translateX(2px);
+}
+
+.process-col-pid {
+  color: var(--text-tertiary);
+  font-family: 'SF Mono', monospace;
+}
+
+.process-col-name {
+  color: var(--text-primary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.process-col-cpu {
+  color: var(--red-primary);
+  font-weight: 600;
+  font-family: 'SF Mono', monospace;
+}
+
+.process-col-mem {
+  color: var(--text-primary);
+  font-family: 'SF Mono', monospace;
+}
+
+.process-col-status {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+/* Responsive Design */
+@media (width <= 1024px) {
+  .monitor-container {
+    grid-template-columns: 1fr;
+  }
+
+  .cpu-cores-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+}
+
+@media (width <= 768px) {
+  .process-table-header,
+  .process-row {
+    grid-template-columns: 60px 1fr 60px 80px;
+    gap: 8px;
+    font-size: 11px;
+  }
+
+  .process-col-status {
+    display: none;
+  }
+
+  .cpu-cores-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
+}
+
+.dashboard-grid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dashboard-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dashboard-grid::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.dashboard-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}

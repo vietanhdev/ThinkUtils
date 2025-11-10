@@ -8,12 +8,11 @@ import { setupFanControl, checkInitialPermissions, startAutoUpdate } from './vie
 import { setupHomeActions, updateHomeView } from './views/home.js';
 import { setupSyncHandlers } from './views/sync.js';
 import { setupBatteryHandlers } from './views/battery.js';
+import { setupSecurityHandlers } from './views/security.js';
 import { setupAboutDialog } from './about.js';
 import { state } from './state.js';
 import { initializeSettings } from './settingsManager.js';
-
-// Check if we're using modular HTML (template loading)
-const isModularHTML = document.getElementById('titlebar-container') !== null;
+import { isModularMode, loadTemplates, injectTemplates } from './templateLoader.js';
 
 async function checkAndSetupPermissions() {
   console.log('[Permissions] Checking permission status...');
@@ -90,10 +89,17 @@ async function initializeApp() {
   console.log('[ThinkUtils] Initializing...');
 
   // If using modular HTML, load templates first
-  if (isModularHTML) {
-    const { loadTemplates, injectTemplates } = await import('./templateLoader.js');
-    const templates = await loadTemplates();
-    injectTemplates(templates);
+  if (isModularMode()) {
+    console.log('[ThinkUtils] Modular mode detected, loading templates...');
+    try {
+      const templates = await loadTemplates();
+      injectTemplates(templates);
+    } catch (error) {
+      console.error('[ThinkUtils] Failed to load templates:', error);
+      // Continue anyway - app might still work with inline HTML
+    }
+  } else {
+    console.log('[ThinkUtils] Using inline HTML mode');
   }
 
   initializeElements();
@@ -103,6 +109,7 @@ async function initializeApp() {
   setupHomeActions();
   setupSyncHandlers();
   setupBatteryHandlers();
+  setupSecurityHandlers();
   setupAboutDialog();
   setupPermissionDialog();
   checkInitialPermissions();

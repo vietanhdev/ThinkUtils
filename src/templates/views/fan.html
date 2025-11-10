@@ -1,0 +1,260 @@
+<div class="fan-control-layout">
+  <!-- Left Column: Status & Monitoring -->
+  <div class="fan-status-section">
+    <div class="fan-status-card">
+      <div class="fan-status-header">
+        <h3>System Status</h3>
+        <div class="mode-badge" id="current-mode">AUTO</div>
+      </div>
+
+      <!-- Temperature Sensors -->
+      <div class="status-section">
+        <div class="status-section-header">
+          <div class="status-icon temp">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
+            </svg>
+          </div>
+          <h4>Temperature</h4>
+        </div>
+        <div id="temp-metrics" class="status-metrics-list"></div>
+      </div>
+
+      <!-- Fan Status -->
+      <div class="status-section">
+        <div class="status-section-header">
+          <div class="status-icon fan">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"
+              />
+            </svg>
+          </div>
+          <h4>Fan</h4>
+        </div>
+        <div id="fan-metrics" class="status-metrics-list"></div>
+      </div>
+
+      <!-- Permission Helper -->
+      <div id="permission-helper" class="fan-permission-banner" style="display: none">
+        <div class="permission-icon">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4m0-4h.01" />
+          </svg>
+        </div>
+        <div class="permission-content">
+          <h4>Permissions Required</h4>
+          <p>Grant access to control fan speeds</p>
+        </div>
+        <button id="btn-grant-permissions" class="permission-grant-btn">Grant</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Control Panel -->
+  <div class="fan-control-section">
+    <div class="fan-control-card">
+      <div class="fan-control-header">
+        <h3>Control Mode</h3>
+      </div>
+
+      <!-- Mode Selector -->
+      <div class="fan-mode-list">
+        <button class="fan-mode-option active" id="btn-auto" data-mode="auto">
+          <div class="mode-option-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 1v6m0 6v6" />
+            </svg>
+          </div>
+          <div class="mode-option-content">
+            <h4>Auto</h4>
+            <p>System controlled cooling</p>
+          </div>
+          <div class="mode-option-check">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+        </button>
+
+        <button class="fan-mode-option" id="btn-manual" data-mode="manual">
+          <div class="mode-option-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M12 20h9" />
+            </svg>
+          </div>
+          <div class="mode-option-content">
+            <h4>Manual</h4>
+            <p>Set custom fan speed</p>
+          </div>
+          <div class="mode-option-check">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+        </button>
+
+        <button class="fan-mode-option" id="btn-curve" data-mode="curve">
+          <div class="mode-option-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M3 3v18h18" />
+              <path d="M7 12l4-4 4 4 4-4" />
+            </svg>
+          </div>
+          <div class="mode-option-content">
+            <h4>Curve</h4>
+            <p>Temperature-based curve</p>
+          </div>
+          <div class="mode-option-check">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+        </button>
+
+        <button class="fan-mode-option" id="btn-full" data-mode="full">
+          <div class="mode-option-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M12 2v20M2 12h20" />
+            </svg>
+          </div>
+          <div class="mode-option-content">
+            <h4>Full Speed</h4>
+            <p>Maximum cooling</p>
+          </div>
+          <div class="mode-option-check">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+        </button>
+      </div>
+
+      <!-- Manual Control Slider -->
+      <div id="slider-section" class="fan-slider-section" style="display: none">
+        <div class="slider-header">
+          <h4>Fan Speed</h4>
+          <span id="slider-value" class="slider-value-display">0%</span>
+        </div>
+        <input type="range" id="fan-slider" class="fan-slider" min="0" max="7" step="1" value="0" />
+        <div class="slider-labels">
+          <span>Off</span>
+          <span>Max</span>
+        </div>
+      </div>
+
+      <!-- Fan Curve Editor -->
+      <div id="curve-section" class="fan-curve-section" style="display: none">
+        <div class="curve-header">
+          <h4>Temperature Curve</h4>
+          <div class="curve-actions">
+            <button id="btn-reset-curve" class="curve-action-btn">Reset</button>
+            <button id="btn-save-curve" class="curve-save-btn">Save Curve</button>
+          </div>
+        </div>
+        <div class="curve-editor">
+          <canvas id="fan-curve-canvas" width="600" height="400"></canvas>
+        </div>
+        <div class="curve-info">
+          <div class="curve-info-item">
+            <span class="curve-info-label">Current Temp</span>
+            <span id="curve-current-temp" class="curve-info-value">--°C</span>
+          </div>
+          <div class="curve-info-item">
+            <span class="curve-info-label">Target Speed</span>
+            <span id="curve-target-speed" class="curve-info-value">Level --</span>
+          </div>
+        </div>
+        <div class="curve-help">
+          <p>
+            Drag points to adjust the fan curve. The fan speed will automatically adjust based on
+            CPU temperature.
+          </p>
+        </div>
+      </div>
+
+      <!-- Status Message -->
+      <div id="status-message" class="fan-status-message"></div>
+    </div>
+  </div>
+</div>

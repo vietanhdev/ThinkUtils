@@ -1,0 +1,91 @@
+<div class="view-header">
+  <h2>System Monitor</h2>
+  <p class="view-subtitle">Real-time resource monitoring</p>
+</div>
+
+<div class="monitor-container">
+  <!-- CPU Monitor -->
+  <div class="card">
+    <div class="card-header">
+      <h3>CPU Usage</h3>
+      <span id="cpu-usage-total" class="monitor-value">0%</span>
+    </div>
+    <div class="progress-bar">
+      <div id="cpu-usage-bar" class="progress-fill" style="width: 0%"></div>
+    </div>
+    <div class="info-list monitor-details">
+      <div class="info-item">
+        <span class="info-label">Load Average</span>
+        <span id="load-avg" class="info-value">0.00 / 0.00 / 0.00</span>
+      </div>
+    </div>
+    <div id="cpu-cores" class="cpu-cores-grid"></div>
+  </div>
+
+  <!-- Memory Monitor -->
+  <div class="card">
+    <div class="card-header">
+      <h3>Memory</h3>
+      <span id="memory-usage-total" class="monitor-value">0%</span>
+    </div>
+    <div class="progress-bar">
+      <div id="memory-usage-bar" class="progress-fill" style="width: 0%"></div>
+    </div>
+    <div class="info-list monitor-details">
+      <div class="info-item">
+        <span class="info-label">Used</span>
+        <span id="memory-used" class="info-value">0 GB</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Available</span>
+        <span id="memory-available" class="info-value">0 GB</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Total</span>
+        <span id="memory-total" class="info-value">0 GB</span>
+      </div>
+    </div>
+    <div class="swap-info">
+      <div class="swap-header">
+        <span>Swap</span>
+        <span id="swap-usage">0 MB / 0 MB</span>
+      </div>
+      <div class="progress-bar">
+        <div id="swap-usage-bar" class="progress-fill swap" style="width: 0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Disk Monitor -->
+  <div class="card">
+    <div class="card-header">
+      <h3>Disk Usage</h3>
+    </div>
+    <div id="disk-list" class="disk-list"></div>
+  </div>
+
+  <!-- Network Monitor -->
+  <div class="card">
+    <div class="card-header">
+      <h3>Network</h3>
+    </div>
+    <div id="network-list" class="network-list"></div>
+  </div>
+
+  <!-- Process Monitor -->
+  <div class="card grid-full">
+    <div class="card-header">
+      <h3>Top Processes</h3>
+    </div>
+    <div class="process-table">
+      <div class="process-table-header">
+        <span class="process-col-pid">PID</span>
+        <span class="process-col-name">Name</span>
+        <span class="process-col-cpu">CPU %</span>
+        <span class="process-col-mem">Memory</span>
+        <span class="process-col-status">Status</span>
+      </div>
+      <div id="process-list" class="process-table-body"></div>
+    </div>
+  </div>
+</div>

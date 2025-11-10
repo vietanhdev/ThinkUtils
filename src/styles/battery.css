@@ -1,0 +1,500 @@
+/* Battery View Styles */
+
+.battery-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.battery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.battery-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 24px;
+  transition: all 0.3s ease;
+}
+
+.battery-card:hover {
+  border-color: var(--red-primary);
+  box-shadow: 0 4px 20px rgb(228 0 43 / 20%);
+  transform: translateY(-2px);
+}
+
+.battery-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.card-description {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+}
+
+.threshold-control {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.threshold-control label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.threshold-input-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.threshold-input-group input[type='range'] {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.threshold-input-group input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--red-primary);
+  cursor: pointer;
+  box-shadow: 0 2px 12px var(--red-glow);
+  transition: all 0.2s ease;
+}
+
+.threshold-input-group input[type='range']::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 16px var(--red-glow);
+}
+
+.threshold-input-group input[type='range']::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--red-primary);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 12px var(--red-glow);
+  transition: all 0.2s ease;
+}
+
+.threshold-input-group input[type='range']::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 16px var(--red-glow);
+}
+
+.battery-button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 16px;
+}
+
+.battery-button.primary {
+  background: var(--red-primary);
+  color: white;
+}
+
+.battery-button.primary:hover {
+  background: var(--red-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--red-glow);
+}
+
+.power-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.power-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: 'SF Mono', monospace;
+}
+
+.battery-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.battery-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.battery-status {
+  padding: 6px 12px;
+  background: var(--red-light);
+  color: var(--red-primary);
+  border: 1px solid rgb(228 0 43 / 30%);
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.battery-capacity {
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--red-primary);
+  text-align: center;
+  margin: 20px 0;
+}
+
+.battery-details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  font-size: 13px;
+}
+
+.battery-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+}
+
+.battery-detail-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.battery-detail-value {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+/* Battery Settings Row */
+.battery-settings-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 24px;
+}
+
+/* Threshold Card */
+.threshold-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 28px;
+  transition: all 0.3s ease;
+}
+
+.threshold-card:hover {
+  border-color: var(--red-primary);
+  box-shadow: 0 4px 20px rgb(228 0 43 / 20%);
+}
+
+.threshold-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.threshold-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--red-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.threshold-icon svg {
+  stroke: var(--red-primary);
+}
+
+.threshold-header-text {
+  flex: 1;
+}
+
+.threshold-card h3 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+}
+
+.threshold-description {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.threshold-info-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgb(59 130 246 / 10%);
+  border: 1px solid rgb(59 130 246 / 20%);
+  border-radius: 8px;
+  margin-bottom: 28px;
+  font-size: 13px;
+  color: #3b82f6;
+}
+
+.threshold-info-banner svg {
+  flex-shrink: 0;
+  stroke: #3b82f6;
+}
+
+.threshold-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.threshold-item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.threshold-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.threshold-item label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.threshold-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--red-primary);
+  font-family: 'SF Mono', monospace;
+}
+
+.threshold-slider-wrapper {
+  position: relative;
+}
+
+.threshold-slider {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+  margin: 12px 0;
+}
+
+.threshold-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--red-primary);
+  cursor: pointer;
+  box-shadow: 0 2px 12px var(--red-glow);
+  transition: all 0.2s ease;
+}
+
+.threshold-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 16px var(--red-glow);
+}
+
+.threshold-slider::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+}
+
+.threshold-slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--red-primary);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 12px var(--red-glow);
+  transition: all 0.2s ease;
+}
+
+.threshold-slider::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 16px var(--red-glow);
+}
+
+.threshold-slider::-moz-range-thumb:active {
+  transform: scale(1.05);
+}
+
+.threshold-marks {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: 'SF Mono', monospace;
+  user-select: none;
+}
+
+.threshold-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.threshold-actions .btn-large {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Battery Tips Card */
+.battery-tips-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 28px;
+  transition: all 0.3s ease;
+}
+
+.battery-tips-card:hover {
+  border-color: var(--red-primary);
+  box-shadow: 0 4px 20px rgb(228 0 43 / 20%);
+}
+
+.tips-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.tips-header svg {
+  stroke: var(--red-primary);
+  flex-shrink: 0;
+}
+
+.tips-header h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tips-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tips-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+
+.tips-list li:hover {
+  background: var(--bg-elevated);
+  transform: translateX(4px);
+}
+
+.tips-list li svg {
+  flex-shrink: 0;
+  stroke: var(--red-primary);
+  margin-top: 2px;
+}
+
+/* Responsive Design */
+@media (width <= 1024px) {
+  .battery-settings-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (width <= 768px) {
+  .battery-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .battery-settings-row {
+    grid-template-columns: 1fr;
+  }
+
+  .threshold-actions {
+    flex-direction: column;
+  }
+
+  .threshold-actions .btn-large {
+    width: 100%;
+  }
+
+  .battery-details {
+    grid-template-columns: 1fr;
+  }
+
+  .threshold-card {
+    padding: 20px;
+  }
+
+  .battery-tips-card {
+    padding: 20px;
+  }
+}

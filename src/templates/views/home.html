@@ -1,0 +1,222 @@
+<div class="home-layout">
+  <!-- System Overview Section -->
+  <section class="home-section">
+    <h2 class="home-section-title">System Overview</h2>
+    <div class="home-overview-compact">
+      <div class="home-compact-item">
+        <div class="compact-icon cpu">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+            <rect x="9" y="9" width="6" height="6" />
+          </svg>
+        </div>
+        <div class="compact-info">
+          <span class="compact-label">CPU</span>
+          <span class="compact-value" id="home-cpu-usage">0%</span>
+        </div>
+        <span class="compact-detail" id="home-cpu-temp">--°C</span>
+      </div>
+
+      <div class="home-compact-item">
+        <div class="compact-icon memory">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0l1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"
+            />
+          </svg>
+        </div>
+        <div class="compact-info">
+          <span class="compact-label">Memory</span>
+          <span class="compact-value" id="home-memory-usage">0%</span>
+        </div>
+        <span class="compact-detail" id="home-memory-used">-- GB</span>
+      </div>
+
+      <div class="home-compact-item">
+        <div class="compact-icon fan">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"
+            />
+          </svg>
+        </div>
+        <div class="compact-info">
+          <span class="compact-label">Fan</span>
+          <span class="compact-value" id="home-fan-speed">-- RPM</span>
+        </div>
+        <span class="compact-detail" id="home-fan-mode">Auto</span>
+      </div>
+
+      <div class="home-compact-item">
+        <div class="compact-icon battery">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <rect x="1" y="6" width="18" height="12" rx="2" ry="2" />
+            <line x1="23" y1="13" x2="23" y2="11" />
+          </svg>
+        </div>
+        <div class="compact-info">
+          <span class="compact-label">Battery</span>
+          <span class="compact-value" id="home-battery-level">---%</span>
+        </div>
+        <span class="compact-detail" id="home-battery-status">Charging</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quick Settings Section -->
+  <section class="home-section">
+    <h2 class="home-section-title">Quick Settings</h2>
+    <div class="home-settings-grid">
+      <!-- Power Profile -->
+      <div class="home-setting-card">
+        <div class="home-setting-header">
+          <div class="home-setting-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+          </div>
+          <div class="home-setting-info">
+            <h3>Power Profile</h3>
+            <p id="home-power-profile">Balanced</p>
+          </div>
+        </div>
+        <div class="home-setting-options">
+          <button class="home-setting-btn" data-profile="power-saver">
+            <span>Power Saver</span>
+          </button>
+          <button class="home-setting-btn active" data-profile="balanced">
+            <span>Balanced</span>
+          </button>
+          <button class="home-setting-btn" data-profile="performance">
+            <span>Performance</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- CPU Governor -->
+      <div class="home-setting-card">
+        <div class="home-setting-header">
+          <div class="home-setting-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+              <rect x="9" y="9" width="6" height="6" />
+            </svg>
+          </div>
+          <div class="home-setting-info">
+            <h3>CPU Governor</h3>
+            <p id="home-cpu-governor">powersave</p>
+          </div>
+        </div>
+        <div class="home-setting-options">
+          <button class="home-setting-btn" data-governor="powersave">
+            <span>Powersave</span>
+          </button>
+          <button class="home-setting-btn" data-governor="performance">
+            <span>Performance</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Turbo Boost -->
+      <div class="home-setting-card">
+        <div class="home-setting-header">
+          <div class="home-setting-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 6v6l4 2" />
+            </svg>
+          </div>
+          <div class="home-setting-info">
+            <h3>Turbo Boost</h3>
+            <p id="home-turbo-status">Enabled</p>
+          </div>
+        </div>
+        <div class="home-setting-toggle">
+          <label class="home-toggle-label">
+            <span>Enable CPU turbo frequencies</span>
+            <div class="toggle-switch-small">
+              <input type="checkbox" id="home-turbo-toggle" checked />
+              <span class="toggle-slider-small"></span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Battery Threshold -->
+      <div class="home-setting-card">
+        <div class="home-setting-header">
+          <div class="home-setting-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="1" y="6" width="18" height="12" rx="2" ry="2" />
+              <line x1="23" y1="13" x2="23" y2="11" />
+            </svg>
+          </div>
+          <div class="home-setting-info">
+            <h3>Battery Threshold</h3>
+            <p id="home-battery-threshold">40% - 80%</p>
+          </div>
+        </div>
+        <div class="home-setting-description">
+          <p>Charge limits help extend battery lifespan</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>

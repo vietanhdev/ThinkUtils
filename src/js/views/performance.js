@@ -33,7 +33,7 @@ function displayCpuInfo(info) {
 
   info.available_governors.forEach((gov) => {
     const btn = document.createElement('button');
-    btn.className = `governor-btn ${gov === info.governor ? 'active' : ''}`;
+    btn.className = `option-btn ${gov === info.governor ? 'active' : ''}`;
     btn.textContent = gov.charAt(0).toUpperCase() + gov.slice(1);
     btn.onclick = () => setCpuGovernor(gov);
     container.appendChild(btn);
@@ -62,7 +62,7 @@ function displayPowerProfiles(profileData) {
 
   profileData.available.forEach((profile) => {
     const btn = document.createElement('button');
-    btn.className = `profile-btn ${profile === profileData.current ? 'active' : ''}`;
+    btn.className = `option-btn ${profile === profileData.current ? 'active' : ''}`;
     btn.textContent = profile
       .split('-')
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))

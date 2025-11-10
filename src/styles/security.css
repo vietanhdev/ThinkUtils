@@ -1,0 +1,789 @@
+/* Security View Styles */
+
+/* Uses common layout components from layouts.css */
+
+.security-container {
+  display: grid;
+  gap: 20px;
+
+  /* Uses default max-width from .feature-view (1400px) */
+}
+
+/* Security-specific icon styling */
+.security-icon {
+  background: var(--red-primary);
+  color: white;
+}
+
+.security-header-info {
+  flex: 1;
+}
+
+.security-header-info h3 {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.security-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.security-status-text {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* Scan Options */
+.scan-options {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.scan-option {
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.scan-option-info h4 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.scan-option-info p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.scan-path-input-group {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  max-width: 600px;
+}
+
+.scan-path-input {
+  flex: 1;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.scan-path-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+/* Scan Results */
+.scan-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+
+.scan-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.summary-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.threats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.threat-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: rgb(239 68 68 / 5%);
+  border: 1px solid rgb(239 68 68 / 20%);
+  border-radius: 8px;
+}
+
+.threat-icon {
+  width: 40px;
+  height: 40px;
+  background: rgb(239 68 68 / 10%);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ef4444;
+  flex-shrink: 0;
+}
+
+.threat-info {
+  flex: 1;
+}
+
+.threat-name {
+  font-weight: 600;
+  color: #ef4444;
+  margin-bottom: 4px;
+}
+
+.threat-path {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.no-threats {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* Install Logs & Scan Logs Sections */
+.install-logs-section,
+.scan-logs-section {
+  margin-top: 24px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 20px;
+}
+
+.install-logs-header,
+.scan-logs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.install-logs-header:hover,
+.scan-logs-header:hover {
+  background: var(--bg-tertiary);
+}
+
+.install-logs-title,
+.scan-logs-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.install-logs-title svg,
+.scan-logs-title svg {
+  stroke: var(--text-secondary);
+}
+
+.install-logs-spinner,
+.scan-logs-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-color);
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.install-logs-toggle,
+.scan-logs-toggle {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.install-logs-toggle:hover,
+.scan-logs-toggle:hover {
+  color: var(--text-primary);
+}
+
+.install-logs-toggle svg,
+.scan-logs-toggle svg {
+  transition: transform 0.3s;
+}
+
+.install-logs-section.collapsed .install-logs-toggle svg,
+.scan-logs-section.collapsed .scan-logs-toggle svg {
+  transform: rotate(-90deg);
+}
+
+.install-logs-content,
+.scan-logs-content {
+  max-height: 300px;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.install-logs-section.collapsed .install-logs-content,
+.scan-logs-section.collapsed .scan-logs-content {
+  max-height: 0;
+}
+
+.install-logs-output,
+.scan-logs-output {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: Monaco, Menlo, 'Ubuntu Mono', monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.install-logs-output::-webkit-scrollbar,
+.scan-logs-output::-webkit-scrollbar {
+  width: 8px;
+}
+
+.install-logs-output::-webkit-scrollbar-track,
+.scan-logs-output::-webkit-scrollbar-track {
+  background: var(--bg-card);
+  border-radius: 4px;
+}
+
+.install-logs-output::-webkit-scrollbar-thumb,
+.scan-logs-output::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.install-logs-output::-webkit-scrollbar-thumb:hover,
+.scan-logs-output::-webkit-scrollbar-thumb:hover {
+  background: #667eea;
+}
+
+.log-line {
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-line.log-success {
+  color: #10b981;
+}
+
+.log-line.log-error {
+  color: #ef4444;
+}
+
+.log-line.log-warning {
+  color: #f59e0b;
+}
+
+/* Pulse hint animation for update button */
+.pulse-hint {
+  animation: pulse 2s ease-in-out;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(102 126 234 / 70%);
+  }
+
+  50% {
+    box-shadow: 0 0 0 10px rgb(102 126 234 / 0%);
+  }
+}
+
+/* Inline Install Logs Section */
+.install-logs-section {
+  margin-top: 16px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 16px;
+  animation: slideDown 0.3s ease-out;
+}
+
+.install-logs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.install-logs-header:hover {
+  background: var(--bg-elevated);
+}
+
+.install-logs-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.install-logs-title svg {
+  color: var(--text-secondary);
+}
+
+.install-logs-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-color);
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.install-logs-toggle {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.install-logs-toggle:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.install-logs-toggle.collapsed svg {
+  transform: rotate(-90deg);
+}
+
+.install-logs-toggle svg {
+  transition: transform 0.2s;
+}
+
+.install-logs-content {
+  margin-top: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease-out;
+}
+
+.install-logs-output {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: Monaco, Menlo, 'Ubuntu Mono', monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.install-logs-output::-webkit-scrollbar {
+  width: 8px;
+}
+
+.install-logs-output::-webkit-scrollbar-track {
+  background: var(--bg-card);
+  border-radius: 4px;
+}
+
+.install-logs-output::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.install-logs-output::-webkit-scrollbar-thumb:hover {
+  background: #667eea;
+}
+
+/* Inline Scan Logs Section */
+.scan-logs-section {
+  margin-top: 20px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 16px;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.scan-logs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.scan-logs-header:hover {
+  background: var(--bg-elevated);
+}
+
+.scan-logs-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.scan-logs-title svg {
+  color: var(--text-secondary);
+}
+
+.scan-logs-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-color);
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.scan-logs-toggle {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.scan-logs-toggle:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.scan-logs-toggle.collapsed svg {
+  transform: rotate(-90deg);
+}
+
+.scan-logs-toggle svg {
+  transition: transform 0.2s;
+}
+
+.scan-logs-content {
+  margin-top: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease-out;
+}
+
+.scan-logs-output {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: Monaco, Menlo, 'Ubuntu Mono', monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.scan-logs-output::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scan-logs-output::-webkit-scrollbar-track {
+  background: var(--bg-card);
+  border-radius: 4px;
+}
+
+.scan-logs-output::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.scan-logs-output::-webkit-scrollbar-thumb:hover {
+  background: #667eea;
+}
+
+.log-info {
+  color: #3b82f6;
+}
+
+/* Installation & Manual Install Dialogs - Security-specific styles */
+.install-log-dialog,
+.manual-install-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.install-log-overlay,
+.manual-install-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 50%);
+  backdrop-filter: blur(4px);
+}
+
+.install-log-content,
+.manual-install-content {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 700px;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 30%);
+  animation: dialogSlideIn 0.3s ease-out;
+}
+
+.install-log-content {
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.manual-install-content {
+  max-width: 600px;
+}
+
+@keyframes dialogSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.install-log-header,
+.manual-install-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.install-log-header h3,
+.manual-install-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.install-log-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--border-color);
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.manual-install-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.manual-install-close:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.install-log-body,
+.manual-install-body {
+  padding: 24px;
+}
+
+.install-log-body {
+  flex: 1;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.manual-install-body p {
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.install-log-output {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  height: 400px;
+  overflow-y: auto;
+  font-family: Monaco, Menlo, 'Ubuntu Mono', monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.install-log-output::-webkit-scrollbar {
+  width: 8px;
+}
+
+.install-log-output::-webkit-scrollbar-track {
+  background: var(--bg-card);
+  border-radius: 4px;
+}
+
+.install-log-output::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.install-log-output::-webkit-scrollbar-thumb:hover {
+  background: #667eea;
+}
+
+.manual-install-command {
+  position: relative;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.manual-install-command code {
+  flex: 1;
+  font-family: Monaco, Menlo, 'Ubuntu Mono', monospace;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.manual-install-copy {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.manual-install-copy:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: #667eea;
+}
+
+.manual-install-note {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.install-log-footer,
+.manual-install-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 16px 24px 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+.install-log-close,
+.manual-install-cancel,
+.manual-install-refresh {
+  min-width: 100px;
+}
+
+/* Responsive Design */
+@media (width <= 768px) {
+  .scan-option {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .scan-path-input-group {
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .scan-summary {
+    grid-template-columns: 1fr;
+  }
+}

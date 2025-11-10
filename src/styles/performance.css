@@ -1,0 +1,69 @@
+/* Performance View Styles */
+
+/* Uses common layout components from layouts.css */
+
+.performance-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* CPU Info Grid - special layout for info items */
+.cpu-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0;
+}
+
+.cpu-info-grid .info-item {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.cpu-info-grid .info-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cpu-info-grid .info-value {
+  font-size: 16px;
+}
+
+/* Turbo Control */
+.turbo-control {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.turbo-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+}
+
+.turbo-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.turbo-status-text {
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 80px;
+  text-align: right;
+  color: var(--text-secondary);
+}
+
+/* Responsive Design */
+@media (width <= 768px) {
+  .governor-grid,
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+}

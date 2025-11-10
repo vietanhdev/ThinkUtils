@@ -25,14 +25,21 @@ export async function checkSyncStatus() {
 
     if (response.success && response.data && response.data.is_logged_in) {
       elements.syncLogin.style.display = 'none';
-      elements.syncDashboard.style.display = 'block';
+      elements.syncDashboard.style.display = 'flex';
 
-      document.getElementById('user-email').textContent = response.data.user_email || 'Unknown';
-      document.getElementById('last-sync').textContent = response.data.last_sync
-        ? `Last synced: ${response.data.last_sync}`
-        : 'Last synced: Never';
+      const emailEl = document.getElementById('user-email');
+      const syncEl = document.getElementById('last-sync');
 
-      updateSyncedSettingsDisplay(response.data.settings);
+      if (emailEl) {
+        emailEl.textContent = response.data.user_email || 'Unknown';
+      }
+      if (syncEl) {
+        syncEl.textContent = response.data.last_sync
+          ? `Last synced: ${response.data.last_sync}`
+          : 'Last synced: Never';
+      }
+
+      updateSyncedSettingsDisplay(response.data.settings || {});
     } else {
       elements.syncLogin.style.display = 'block';
       elements.syncDashboard.style.display = 'none';
@@ -77,11 +84,19 @@ async function handleGoogleLogin() {
         if (statusResponse.success && statusResponse.data && statusResponse.data.is_logged_in) {
           clearInterval(checkInterval);
           elements.syncLogin.style.display = 'none';
-          elements.syncDashboard.style.display = 'block';
-          document.getElementById('user-email').textContent = statusResponse.data.user_email;
-          document.getElementById('last-sync').textContent =
-            `Last synced: ${statusResponse.data.last_sync}`;
-          updateSyncedSettingsDisplay(statusResponse.data.settings);
+          elements.syncDashboard.style.display = 'flex';
+
+          const emailEl = document.getElementById('user-email');
+          const syncEl = document.getElementById('last-sync');
+
+          if (emailEl) {
+            emailEl.textContent = statusResponse.data.user_email;
+          }
+          if (syncEl) {
+            syncEl.textContent = `Last synced: ${statusResponse.data.last_sync}`;
+          }
+
+          updateSyncedSettingsDisplay(statusResponse.data.settings || {});
           showStatus('✓ Logged in successfully', 'success');
         } else if (attempts >= maxAttempts) {
           clearInterval(checkInterval);
@@ -183,9 +198,17 @@ async function handleDownloadSettings() {
 }
 
 function updateSyncedSettingsDisplay(settings) {
-  document.getElementById('synced-fan-mode').textContent = settings.fan_mode || 'auto';
-  document.getElementById('synced-theme').textContent = settings.theme || 'system';
-  document.getElementById('synced-autostart').textContent = settings.auto_start
-    ? 'Enabled'
-    : 'Disabled';
+  const fanModeEl = document.getElementById('synced-fan-mode');
+  const themeEl = document.getElementById('synced-theme');
+  const autostartEl = document.getElementById('synced-autostart');
+
+  if (fanModeEl) {
+    fanModeEl.textContent = settings.fan_mode || 'auto';
+  }
+  if (themeEl) {
+    themeEl.textContent = settings.theme || 'system';
+  }
+  if (autostartEl) {
+    autostartEl.textContent = settings.auto_start ? 'Enabled' : 'Disabled';
+  }
 }

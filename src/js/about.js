@@ -1,7 +1,7 @@
 // About Dialog
 export function setupAboutDialog() {
   const aboutLink = document.getElementById('about-link');
-  const closeAbout = document.getElementById('close-about');
+  const closeAboutBtn = document.getElementById('close-about');
 
   if (aboutLink) {
     aboutLink.addEventListener('click', (e) => {
@@ -11,8 +11,12 @@ export function setupAboutDialog() {
     });
   }
 
-  if (closeAbout) {
-    closeAbout.addEventListener('click', closeAbout);
+  if (closeAboutBtn) {
+    closeAboutBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeAbout();
+    });
   }
 }
 

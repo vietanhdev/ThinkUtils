@@ -1,0 +1,63 @@
+<div class="view-header">
+  <h2>Performance Settings</h2>
+  <p class="view-subtitle">Optimize CPU and power settings</p>
+</div>
+
+<div class="performance-container">
+  <!-- CPU Info Card -->
+  <div class="card">
+    <div class="card-header">
+      <h3>CPU Information</h3>
+    </div>
+    <div id="cpu-info" class="info-list cpu-info-grid">
+      <div class="info-item">
+        <span class="info-label">Governor</span>
+        <span id="cpu-governor" class="info-value">--</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Current Frequency</span>
+        <span id="cpu-freq" class="info-value">-- MHz</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Frequency Range</span>
+        <span id="cpu-freq-range" class="info-value">-- MHz</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CPU Governor Card -->
+  <div class="card">
+    <div class="card-header">
+      <h3>CPU Governor</h3>
+    </div>
+    <p class="card-description">Control CPU frequency scaling policy</p>
+    <div id="governor-buttons" class="option-grid"></div>
+  </div>
+
+  <!-- Power Profile Card -->
+  <div class="card">
+    <div class="card-header">
+      <h3>Power Profile</h3>
+    </div>
+    <p class="card-description">System-wide power management profile</p>
+    <div id="profile-buttons" class="option-grid"></div>
+  </div>
+
+  <!-- Turbo Boost Card -->
+  <div class="card">
+    <div class="card-header">
+      <h3>Turbo Boost</h3>
+    </div>
+    <p class="card-description">Enable or disable CPU turbo frequencies</p>
+    <div class="turbo-control">
+      <div class="turbo-toggle-wrapper">
+        <span class="turbo-label">Turbo Boost</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="turbo-toggle" />
+          <span class="toggle-slider"></span>
+        </label>
+        <span id="turbo-status-text" class="turbo-status-text">Loading...</span>
+      </div>
+    </div>
+  </div>
+</div>

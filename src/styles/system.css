@@ -1,0 +1,60 @@
+/* System Info View Styles */
+
+/* Uses common layout components from layouts.css */
+
+/* Legacy class mappings for backward compatibility */
+.system-container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.system-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 24px;
+  transition: all 0.3s ease;
+}
+
+.system-card:hover {
+  border-color: var(--red-primary);
+  box-shadow: 0 4px 20px rgb(228 0 43 / 20%);
+  transform: translateY(-2px);
+}
+
+.system-card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.system-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.system-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.system-info-item:hover {
+  background: var(--bg-elevated);
+}
+
+/* Responsive Design */
+@media (width <= 768px) {
+  .system-container {
+    grid-template-columns: 1fr;
+  }
+}

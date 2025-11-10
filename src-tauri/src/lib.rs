@@ -8,6 +8,7 @@ mod monitor;
 mod auth;
 mod permissions;
 mod settings;
+mod security;
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -202,6 +203,12 @@ pub fn run() {
             performance::set_turbo_boost,
             // Monitor
             monitor::get_system_monitor,
+            // Security
+            security::get_security_status,
+            security::update_virus_definitions,
+            security::scan_path,
+            security::quick_scan,
+            security::install_clamav,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
