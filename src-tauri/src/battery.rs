@@ -160,9 +160,43 @@ pub async fn set_battery_thresholds(start: u8, stop: u8) -> ApiResponse<String> 
     let start_path = format!("{}/charge_control_start_threshold", BAT0_PATH);
     let stop_path = format!("{}/charge_control_end_threshold", BAT0_PATH);
 
+    let current = match get_battery_thresholds() {
+        ApiResponse {
+            success: true,
+            data: Some(thresholds),
+            ..
+        } => thresholds,
+        ApiResponse {
+            error: Some(err), ..
+        } => {
+            return ApiResponse {
+                success: false,
+                data: None,
+                error: Some(format!("Failed to read current thresholds: {}", err)),
+            };
+        }
+        _ => {
+            return ApiResponse {
+                success: false,
+                data: None,
+                error: Some("Failed to read current thresholds: unknown error".to_string()),
+            };
+        }
+    };
+
+    let (first_path, first_value, second_path, second_value) = if stop < current.start {
+        // Lowering stop, so we need to write new start first, then new stop (avoids start > stop temporarily)
+        (start_path, start.to_string(), stop_path, stop.to_string())
+    } else {
+        // Bugfix - writing new stop first
+        (stop_path, stop.to_string(), start_path, start.to_string())
+    };
+
     // Try direct write first
-    if fs::write(&start_path, start.to_string()).is_ok()
-        && fs::write(&stop_path, stop.to_string()).is_ok() {
+    // Used new proper varibles
+    if fs::write(&first_path, &first_value).is_ok()
+        && fs::write(&second_path, &second_value).is_ok()
+    {
         return ApiResponse {
             success: true,
             data: Some(format!("Thresholds set: {}%-{}%", start, stop)),
@@ -172,9 +206,10 @@ pub async fn set_battery_thresholds(start: u8, stop: u8) -> ApiResponse<String> 
 
     // Need elevated permissions
     let temp_script = format!("/tmp/battery_thresholds_{}.sh", std::process::id());
+    // Used new proper varibles
     let script_content = format!(
         "#!/bin/bash\nset -e\necho {} > {}\necho {} > {}\nexit 0\n",
-        start, start_path, stop, stop_path
+        first_value, first_path, second_value, second_path
     );
 
     if let Err(e) = fs::write(&temp_script, script_content) {
