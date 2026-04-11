@@ -1,6 +1,6 @@
 [package]
 name = "thinkutils"
-version = "0.1.7"
+version = "0.1.8"
 description = "ThinkPad utilities for Linux - Fan control, battery management, and system monitoring"
 authors = ["Viet Anh Nguyen"]
 edition = "2021"
