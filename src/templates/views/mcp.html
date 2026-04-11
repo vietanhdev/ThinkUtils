@@ -80,6 +80,7 @@
       <button class="mcp-tab" data-tab="claude-desktop">Claude Desktop</button>
       <button class="mcp-tab" data-tab="chatgpt">ChatGPT</button>
       <button class="mcp-tab" data-tab="cursor">Cursor / Windsurf</button>
+      <button class="mcp-tab" data-tab="lm-studio">LM Studio</button>
       <button class="mcp-tab" data-tab="other">Other</button>
     </div>
 
@@ -142,6 +143,33 @@ Name: thinkutils
 URL: http://127.0.0.1:8765/sse
 Transport: SSE</pre
       >
+    </div>
+
+    <div class="mcp-tab-content" id="tab-lm-studio">
+      <p>
+        In LM Studio, open <strong>Settings</strong> (gear icon), go to the
+        <strong>MCP</strong> section, and add a new server:
+      </p>
+      <pre class="mcp-config">
+Name: thinkutils
+Transport: SSE
+URL: http://127.0.0.1:8765/sse</pre
+      >
+      <p class="mcp-note">
+        Alternatively, add it to
+        <code>~/.lmstudio/config/mcp-servers.json</code>:
+      </p>
+      <pre class="mcp-config" id="config-lm-studio">
+{
+  "servers": {
+    "thinkutils": {
+      "url": "http://127.0.0.1:8765/sse"
+    }
+  }
+}</pre
+      >
+      <button class="btn-secondary btn-copy" data-target="tab-lm-studio">Copy</button>
+      <p class="mcp-note">Requires LM Studio 0.3.6 or later with MCP support enabled.</p>
     </div>
 
     <div class="mcp-tab-content" id="tab-other">

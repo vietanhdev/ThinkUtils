@@ -10,6 +10,38 @@ use tokio_util::sync::CancellationToken;
 
 const HELPER_PATH: &str = "/usr/local/bin/thinkutils-fan-control";
 
+const VALID_FAN_SPEEDS: &[&str] = &["auto", "full-speed", "0", "1", "2", "3", "4", "5", "6", "7"];
+
+fn validate_fan_speed(speed: &str) -> Option<String> {
+    if VALID_FAN_SPEEDS.contains(&speed) {
+        None
+    } else {
+        Some(format!("Invalid speed '{}'. Use: auto, full-speed, or 0-7", speed))
+    }
+}
+
+fn validate_battery_thresholds(start: u32, stop: u32) -> Option<String> {
+    if start >= stop {
+        Some("Start must be less than stop".into())
+    } else if stop > 100 {
+        Some("Thresholds must be 0-100".into())
+    } else {
+        None
+    }
+}
+
+fn validate_mcp_host(host: &str) -> Option<String> {
+    if host != "127.0.0.1" && host != "0.0.0.0" && host != "localhost" {
+        Some("Host must be 127.0.0.1, 0.0.0.0, or localhost".into())
+    } else {
+        None
+    }
+}
+
+fn resolve_bind_host(host: &str) -> &str {
+    if host == "localhost" { "127.0.0.1" } else { host }
+}
+
 // -- Shared state for managing the MCP server lifecycle --
 
 pub struct McpServerState {
@@ -70,9 +102,8 @@ impl ThinkUtilsHandler {
 
     #[tool(description = "Set ThinkPad fan speed. Values: 'auto', 'full-speed', or '0' through '7'")]
     fn set_fan_speed(&self, #[tool(aggr)] req: SetFanSpeedRequest) -> String {
-        let valid = ["auto", "full-speed", "0", "1", "2", "3", "4", "5", "6", "7"];
-        if !valid.contains(&req.speed.as_str()) {
-            return format!("Invalid speed '{}'. Use: auto, full-speed, or 0-7", req.speed);
+        if let Some(err) = validate_fan_speed(&req.speed) {
+            return err;
         }
         let command = format!("level {}", req.speed);
         if fs::write("/proc/acpi/ibm/fan", &command).is_ok() {
@@ -118,8 +149,9 @@ impl ThinkUtilsHandler {
 
     #[tool(description = "Set battery charge thresholds (start and stop percentages)")]
     fn set_battery_thresholds(&self, #[tool(aggr)] req: SetBatteryThresholdsRequest) -> String {
-        if req.start >= req.stop { return "Start must be less than stop".into(); }
-        if req.stop > 100 { return "Thresholds must be 0-100".into(); }
+        if let Some(err) = validate_battery_thresholds(req.start, req.stop) {
+            return err;
+        }
         let mut r = Vec::new();
         match fs::write("/sys/class/power_supply/BAT0/charge_stop_threshold", req.stop.to_string()) {
             Ok(_) => r.push(format!("Stop set to {}%", req.stop)),
@@ -234,16 +266,15 @@ pub async fn start_mcp_server(
         });
     }
 
-    // Validate host
-    if host != "127.0.0.1" && host != "0.0.0.0" && host != "localhost" {
+    if let Some(err) = validate_mcp_host(&host) {
         return Ok(ApiResponse {
             success: false,
             data: None,
-            error: Some("Host must be 127.0.0.1, 0.0.0.0, or localhost".into()),
+            error: Some(err),
         });
     }
 
-    let bind_host = if host == "localhost" { "127.0.0.1" } else { &host };
+    let bind_host = resolve_bind_host(&host);
     let addr: SocketAddr = format!("{}:{}", bind_host, port).parse()
         .map_err(|e| format!("Invalid address: {}", e))?;
 
@@ -321,5 +352,115 @@ pub async fn stop_mcp_server(state: tauri::State<'_, McpState>) -> Result<ApiRes
             data: None,
             error: Some("MCP server is not running".into()),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -- Fan speed validation --
+
+    #[test]
+    fn valid_fan_speeds_accepted() {
+        for speed in VALID_FAN_SPEEDS {
+            assert!(validate_fan_speed(speed).is_none(), "expected '{}' to be valid", speed);
+        }
+    }
+
+    #[test]
+    fn invalid_fan_speeds_rejected() {
+        for speed in &["8", "-1", "turbo", "", "Auto", "FULL-SPEED"] {
+            let err = validate_fan_speed(speed);
+            assert!(err.is_some(), "expected '{}' to be invalid", speed);
+            assert!(err.unwrap().contains(speed));
+        }
+    }
+
+    // -- Battery threshold validation --
+
+    #[test]
+    fn valid_battery_thresholds() {
+        assert!(validate_battery_thresholds(40, 80).is_none());
+        assert!(validate_battery_thresholds(0, 100).is_none());
+        assert!(validate_battery_thresholds(0, 1).is_none());
+    }
+
+    #[test]
+    fn battery_start_must_be_less_than_stop() {
+        assert_eq!(validate_battery_thresholds(80, 80).unwrap(), "Start must be less than stop");
+        assert_eq!(validate_battery_thresholds(90, 80).unwrap(), "Start must be less than stop");
+    }
+
+    #[test]
+    fn battery_stop_must_be_at_most_100() {
+        assert_eq!(validate_battery_thresholds(50, 101).unwrap(), "Thresholds must be 0-100");
+    }
+
+    // -- MCP host validation --
+
+    #[test]
+    fn valid_mcp_hosts() {
+        assert!(validate_mcp_host("127.0.0.1").is_none());
+        assert!(validate_mcp_host("0.0.0.0").is_none());
+        assert!(validate_mcp_host("localhost").is_none());
+    }
+
+    #[test]
+    fn invalid_mcp_hosts_rejected() {
+        for host in &["192.168.1.1", "10.0.0.1", "example.com", ""] {
+            assert!(validate_mcp_host(host).is_some(), "expected '{}' to be rejected", host);
+        }
+    }
+
+    // -- Bind host resolution --
+
+    #[test]
+    fn localhost_resolves_to_ip() {
+        assert_eq!(resolve_bind_host("localhost"), "127.0.0.1");
+    }
+
+    #[test]
+    fn ip_hosts_pass_through() {
+        assert_eq!(resolve_bind_host("127.0.0.1"), "127.0.0.1");
+        assert_eq!(resolve_bind_host("0.0.0.0"), "0.0.0.0");
+    }
+
+    // -- McpServerState defaults --
+
+    #[test]
+    fn default_state() {
+        let state = McpServerState::default();
+        assert_eq!(state.host, "127.0.0.1");
+        assert_eq!(state.port, 8765);
+        assert!(state.cancel_token.is_none());
+    }
+
+    // -- ApiResponse serialization --
+
+    #[test]
+    fn api_response_success_serialization() {
+        let resp = ApiResponse {
+            success: true,
+            data: Some("ok".to_string()),
+            error: None,
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["success"], true);
+        assert_eq!(json["data"], "ok");
+        assert!(json["error"].is_null());
+    }
+
+    #[test]
+    fn api_response_error_serialization() {
+        let resp: ApiResponse<String> = ApiResponse {
+            success: false,
+            data: None,
+            error: Some("something broke".into()),
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["success"], false);
+        assert!(json["data"].is_null());
+        assert_eq!(json["error"], "something broke");
     }
 }
