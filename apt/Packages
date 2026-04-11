@@ -1,0 +1,15 @@
+Package: thinkutils
+Version: 0.1.8
+Architecture: amd64
+Maintainer: Viet Anh Nguyen
+Installed-Size: 24882
+Depends: libayatana-appindicator3-1, libwebkit2gtk-4.1-0, libgtk-3-0
+Filename: ./thinkutils_v0.1.8_amd64.deb
+Size: 8288866
+MD5sum: 0a64df1de09822679e576287129c6f81
+SHA1: 5e86d090e94bc61169d642749b31346958183eca
+SHA256: d43acafd9055738882ce540d52c5046900403ecd77f11e9188582eccd4580494
+Priority: optional
+Description: ThinkPad utilities for Linux - Fan control, battery management, and system monitoring
+ (none)
+
