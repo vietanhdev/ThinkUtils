@@ -1,0 +1,71 @@
+/* ThinkPad-inspired theme for ThinkUtils docs */
+
+:root {
+  --vp-c-brand-1: #e4002b;
+  --vp-c-brand-2: #cc0027;
+  --vp-c-brand-3: #b30022;
+  --vp-c-brand-soft: rgb(228 0 43 / 14%);
+  --vp-button-brand-bg: #e4002b;
+  --vp-button-brand-hover-bg: #cc0027;
+  --vp-button-brand-active-bg: #b30022;
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(135deg, #e4002b 0%, #ff4d6a 100%);
+  --vp-home-hero-image-background-image: linear-gradient(
+    135deg,
+    rgb(228 0 43 / 20%) 0%,
+    rgb(255 77 106 / 10%) 100%
+  );
+  --vp-home-hero-image-filter: blur(56px);
+}
+
+.dark {
+  --vp-c-brand-1: #ff4d6a;
+  --vp-c-brand-2: #e4002b;
+  --vp-c-brand-3: #ff6680;
+  --vp-c-brand-soft: rgb(255 77 106 / 14%);
+  --vp-button-brand-bg: #e4002b;
+  --vp-button-brand-hover-bg: #ff4d6a;
+  --vp-button-brand-active-bg: #cc0027;
+  --vp-home-hero-image-background-image: linear-gradient(
+    135deg,
+    rgb(228 0 43 / 30%) 0%,
+    rgb(255 77 106 / 15%) 100%
+  );
+}
+
+/* Hero image styling */
+.VPHero .VPImage {
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 15%);
+}
+
+.dark .VPHero .VPImage {
+  box-shadow: 0 8px 32px rgb(0 0 0 / 40%);
+}
+
+/* Feature cards */
+.VPFeature {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.VPFeature:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgb(228 0 43 / 10%);
+}
+
+.dark .VPFeature:hover {
+  box-shadow: 0 4px 16px rgb(255 77 106 / 10%);
+}
+
+/* Screenshots in docs */
+.vp-doc img {
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 10%);
+  margin: 1rem 0;
+}
+
+.dark .vp-doc img {
+  box-shadow: 0 4px 16px rgb(0 0 0 / 30%);
+}

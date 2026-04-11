@@ -4,9 +4,10 @@
 
 ```
 src/
-├── styles.css (Main Entry - imports all modules)
+├── styles.css (Main entry point — imports all modules)
 └── styles/
-    ├── common.css          # Shared: Variables, Layout, Navigation, Buttons
+    ├── common.css          # Variables, reset, layout, navigation, buttons
+    ├── layouts.css         # Reusable layout components (cards, headers)
     ├── home.css            # Home page dashboard
     ├── fan.css             # Fan control interface
     ├── battery.css         # Battery management
@@ -15,8 +16,9 @@ src/
     ├── sync.css            # Settings sync
     ├── system.css          # System information
     ├── security.css        # Security features
+    ├── mcp.css             # MCP server management
     ├── dialogs.css         # Modal dialogs
-    └── README.md           # Documentation
+    └── README.md           # Quick reference
 ```
 
 ## Import Chain
@@ -24,7 +26,8 @@ src/
 ```
 index.html
     └── styles.css
-        ├── common.css (loaded first - contains variables)
+        ├── common.css      (loaded first — contains variables)
+        ├── layouts.css     (reusable layout components)
         ├── home.css
         ├── fan.css
         ├── battery.css
@@ -33,6 +36,7 @@ index.html
         ├── sync.css
         ├── system.css
         ├── security.css
+        ├── mcp.css
         └── dialogs.css
 ```
 
@@ -107,7 +111,7 @@ index.html
 └─────────────────────────────────────┘
 ```
 
-## CSS Variables Hierarchy
+## CSS Variables
 
 ```css
 :root {
@@ -116,19 +120,19 @@ index.html
   --red-hover
   --red-light
   --red-glow
-  
+
   /* Backgrounds */
   --bg-primary
   --bg-secondary
   --bg-tertiary
   --bg-elevated
   --bg-card
-  
+
   /* Text */
   --text-primary
   --text-secondary
   --text-tertiary
-  
+
   /* Borders & Effects */
   --border-color
   --border-light
@@ -156,40 +160,27 @@ Small Mobile (< 480px)
 2. **CSS Reset** (common.css)
 3. **CSS Variables** (common.css)
 4. **Base styles** (common.css)
-5. **Layout components** (common.css)
+5. **Layout components** (layouts.css)
 6. **Page-specific styles** (individual page CSS)
 7. **Responsive overrides** (in each file)
 
 ## File Size Breakdown
 
-| File | Approximate Lines | Purpose |
-|------|------------------|---------|
-| common.css | ~600 | Shared styles |
-| home.css | ~400 | Home page |
-| fan.css | ~500 | Fan control |
-| battery.css | ~300 | Battery |
-| performance.css | ~200 | Performance |
-| monitor.css | ~400 | Monitoring |
-| sync.css | ~250 | Sync |
-| system.css | ~150 | System info |
-| security.css | ~350 | Security |
-| dialogs.css | ~250 | Dialogs |
-| **Total** | **~3,400** | **All styles** |
-
-## Benefits
-
-### Before (Single File)
-- ❌ 3940 lines in one file
-- ❌ Hard to find specific styles
-- ❌ Merge conflicts
-- ❌ Slow to load and parse
-
-### After (Modular)
-- ✅ Organized by page/component
-- ✅ Easy to locate styles
-- ✅ Parallel development
-- ✅ Better caching
-- ✅ Maintainable
+| File | Lines | Purpose |
+|------|-------|---------|
+| common.css | ~620 | Shared styles, variables, navigation |
+| layouts.css | ~690 | Reusable layout components |
+| fan.css | ~715 | Fan control |
+| security.css | ~790 | Security features |
+| battery.css | ~500 | Battery management |
+| home.css | ~470 | Home dashboard |
+| monitor.css | ~340 | System monitoring |
+| dialogs.css | ~290 | Modal dialogs |
+| mcp.css | ~190 | MCP server management |
+| sync.css | ~85 | Settings sync |
+| performance.css | ~70 | CPU/Performance |
+| system.css | ~60 | System information |
+| **Total** | **~4,820** | **All styles** |
 
 ## Development Workflow
 
@@ -198,7 +189,7 @@ Small Mobile (< 480px)
 2. Add page-specific styles
 3. Import in `src/styles.css`:
    ```css
-   @import './styles/newpage.css';
+   @import url('./styles/newpage.css');
    ```
 
 ### Modifying Existing Styles
@@ -208,30 +199,13 @@ Small Mobile (< 480px)
 4. Test in browser
 
 ### Adding Shared Components
-1. Add to `common.css`
+1. Add to `common.css` or `layouts.css`
 2. Use CSS variables for consistency
-3. Document in comments
 
 ## Best Practices
 
 1. **Use CSS Variables**: Always reference variables for colors, spacing
 2. **Scope Styles**: Keep page-specific styles in their files
-3. **Avoid Duplication**: Move repeated styles to common.css
-4. **Naming Convention**: Use descriptive, hierarchical class names
-5. **Comments**: Add section headers for organization
-6. **Responsive**: Include breakpoints in the same file as the component
-
-## Testing
-
-After making changes:
-1. Check all affected pages
-2. Test responsive breakpoints
-3. Verify no style conflicts
-4. Check browser console for errors
-
-## Performance
-
-- CSS modules enable better browser caching
-- Only changed files need to be re-downloaded
-- Smaller individual files parse faster
-- @import is processed at build time
+3. **Avoid Duplication**: Move repeated styles to common.css or layouts.css
+4. **Naming Convention**: Use descriptive, hierarchical class names (e.g., `.fan-control-card`)
+5. **Responsive**: Include breakpoints in the same file as the component

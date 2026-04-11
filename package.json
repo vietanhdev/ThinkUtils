@@ -18,7 +18,10 @@
     "format:check": "prettier --check 'src/**/*.{js,html,css,json}'",
     "validate": "npm run lint && npm run format:check",
     "precommit": "npm run validate",
-    "prepare": "husky"
+    "prepare": "husky",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
@@ -28,6 +31,7 @@
     "lint-staged": "^16.2.6",
     "prettier": "^3.2.5",
     "stylelint": "^16.2.1",
-    "stylelint-config-standard": "^36.0.0"
+    "stylelint-config-standard": "^36.0.0",
+    "vitepress": "^1.6.4"
   }
 }
