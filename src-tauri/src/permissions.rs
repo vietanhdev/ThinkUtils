@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
+use crate::fan_control::{HELPER_PATH, HELPER_SCRIPT, POLKIT_RULE, POLKIT_RULE_PATH};
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiResponse<T> {
     pub success: bool,
@@ -38,6 +40,17 @@ pub async fn check_permissions_status() -> ApiResponse<PermissionStatus> {
                 Err(_) => {
                     missing_files.push(file_path.to_string());
                 }
+            }
+        }
+    }
+
+    // Also check if fan control helper + polkit rule are installed
+    if !Path::new(HELPER_PATH).exists() || !Path::new(POLKIT_RULE_PATH).exists() {
+        // Can we at least write to the fan file directly?
+        let fan_path = "/proc/acpi/ibm/fan";
+        if Path::new(fan_path).exists() {
+            if fs::OpenOptions::new().write(true).open(fan_path).is_err() {
+                missing_files.push("Fan control helper (not installed)".to_string());
             }
         }
     }
@@ -94,6 +107,20 @@ pub async fn setup_permissions() -> ApiResponse<String> {
         script_lines.push(format!("  chown {}:root {} 2>/dev/null || true", username, fan_file));
         script_lines.push("fi".to_string());
     }
+
+    // Also install the fan control helper + polkit rule so the user
+    // doesn't have to click "Grant Permissions" again on the fan page.
+    // Uses shared constants from fan_control module to avoid duplication.
+    script_lines.push(format!("cat > {} << 'HELPEREOF'", HELPER_PATH));
+    script_lines.push(HELPER_SCRIPT.trim().to_string());
+    script_lines.push("HELPEREOF".to_string());
+    script_lines.push(format!("chmod 755 {}", HELPER_PATH));
+
+    script_lines.push("mkdir -p /etc/polkit-1/rules.d".to_string());
+    script_lines.push(format!("cat > {} << 'RULEEOF'", POLKIT_RULE_PATH));
+    script_lines.push(POLKIT_RULE.trim().to_string());
+    script_lines.push("RULEEOF".to_string());
+    script_lines.push("systemctl reload polkit 2>/dev/null || killall -HUP polkitd 2>/dev/null || true".to_string());
 
     script_lines.push("echo 'Permissions setup complete!'".to_string());
     script_lines.push("exit 0".to_string());

@@ -5,12 +5,12 @@ use std::process::Command;
 use regex::Regex;
 
 const PROC_FAN: &str = "/proc/acpi/ibm/fan";
-const HELPER_PATH: &str = "/usr/local/bin/thinkutils-fan-control";
-const POLKIT_RULE_PATH: &str = "/etc/polkit-1/rules.d/50-thinkutils.rules";
+pub const HELPER_PATH: &str = "/usr/local/bin/thinkutils-fan-control";
+pub const POLKIT_RULE_PATH: &str = "/etc/polkit-1/rules.d/50-thinkutils.rules";
 
 /// Dedicated fan control helper script - validates input before writing to fan.
-/// Installed at HELPER_PATH by update_permissions().
-const HELPER_SCRIPT: &str = r#"#!/bin/bash
+/// Installed at HELPER_PATH by setup_permissions().
+pub const HELPER_SCRIPT: &str = r#"#!/bin/bash
 set -e
 FAN="/proc/acpi/ibm/fan"
 case "$1" in
@@ -26,7 +26,7 @@ esac
 
 /// Polkit rule that only allows the dedicated helper script without password.
 /// Much tighter than allowing arbitrary bash execution.
-const POLKIT_RULE: &str = r#"/* ThinkUtils: Allow passwordless fan control via dedicated helper only */
+pub const POLKIT_RULE: &str = r#"/* ThinkUtils: Allow passwordless fan control via dedicated helper only */
 polkit.addRule(function(action, subject) {
     if (action.id == "org.freedesktop.policykit.exec") {
         var program = action.lookup("program");
@@ -302,75 +302,5 @@ pub fn check_permissions() -> ApiResponse<bool> {
         success: true,
         data: Some(has_permission),
         error: None,
-    }
-}
-
-#[tauri::command]
-pub async fn update_permissions() -> ApiResponse<String> {
-    println!("[Permissions] Installing fan control helper and polkit rule");
-
-    // Build an install script that:
-    // 1. Installs a dedicated fan control helper with input validation
-    // 2. Installs a tight polkit rule that only allows that specific helper
-    let lines: Vec<String> = vec![
-        "#!/bin/bash".into(),
-        "set -e".into(),
-        format!("cat > {} << 'HELPEREOF'", HELPER_PATH),
-        HELPER_SCRIPT.trim().into(),
-        "HELPEREOF".into(),
-        format!("chmod 755 {}", HELPER_PATH),
-        "mkdir -p /etc/polkit-1/rules.d".into(),
-        format!("cat > {} << 'RULEEOF'", POLKIT_RULE_PATH),
-        POLKIT_RULE.trim().into(),
-        "RULEEOF".into(),
-        "systemctl reload polkit 2>/dev/null || killall -HUP polkitd 2>/dev/null || true".into(),
-        "exit 0".into(),
-    ];
-    let script_content = lines.join("\n");
-
-    let temp_script = match create_secure_temp_script(&script_content) {
-        Ok(path) => path,
-        Err(e) => {
-            return ApiResponse {
-                success: false,
-                data: None,
-                error: Some(e),
-            };
-        }
-    };
-
-    match tokio::process::Command::new("pkexec")
-        .arg("bash")
-        .arg(&temp_script)
-        .output()
-        .await
-    {
-        Ok(output) => {
-            let _ = fs::remove_file(&temp_script);
-
-            if output.status.success() {
-                println!("[Permissions] ✓ Helper and polkit rule installed successfully");
-                ApiResponse {
-                    success: true,
-                    data: Some("Permissions configured successfully. Fan control will now work without repeated prompts.".to_string()),
-                    error: None,
-                }
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                ApiResponse {
-                    success: false,
-                    data: None,
-                    error: Some(format!("Failed to install permissions: {}", stderr)),
-                }
-            }
-        }
-        Err(e) => {
-            let _ = fs::remove_file(&temp_script);
-            ApiResponse {
-                success: false,
-                data: None,
-                error: Some(format!("Failed to run pkexec: {}", e)),
-            }
-        }
     }
 }

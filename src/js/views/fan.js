@@ -284,12 +284,13 @@ export { setFanMode };
 
 async function tryUpdatePermissions() {
   try {
-    showStatus('Requesting permissions...', 'info');
+    showStatus('Setting up permissions...', 'info');
 
-    const response = await invoke('update_permissions');
+    // Use the comprehensive setup that handles sysfs + fan helper + polkit rule
+    const response = await invoke('setup_permissions');
 
     if (response.success) {
-      showStatus('✓ Permissions granted!', 'success');
+      showStatus('✓ All permissions granted!', 'success');
       elements.permissionHelper.style.display = 'none';
     } else {
       showStatus(`Failed: ${response.error}`, 'error');

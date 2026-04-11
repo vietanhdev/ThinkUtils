@@ -55,6 +55,9 @@ async function setupPermissions() {
     if (response.success) {
       console.log('[Permissions] ✓ Setup successful');
       hidePermissionDialog();
+      // Re-check fan permissions since setup_permissions also installs
+      // the fan helper + polkit rule, so the fan page helper can be hidden
+      await checkInitialPermissions();
       return true;
     } else {
       console.error('[Permissions] ✗ Setup failed:', response.error);
@@ -112,11 +115,12 @@ async function initializeApp() {
   setupSecurityHandlers();
   setupAboutDialog();
   setupPermissionDialog();
-  checkInitialPermissions();
   startAutoUpdate();
 
-  // Check permissions at startup
+  // Check all permissions at startup (sysfs + fan helper + polkit rule).
+  // One dialog handles everything. After setup, re-check fan permissions.
   await checkAndSetupPermissions();
+  await checkInitialPermissions();
 
   // Load and apply all settings
   console.log('[ThinkUtils] Loading settings...');
