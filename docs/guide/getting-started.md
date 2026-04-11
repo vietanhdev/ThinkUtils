@@ -2,6 +2,8 @@
 
 ThinkUtils is a native Linux desktop app for ThinkPad laptops, built with [Tauri](https://tauri.app/). It gives you direct control over hardware that's normally locked behind command-line tools or config files.
 
+![ThinkUtils Home Dashboard](/screenshots/home.png)
+
 ## Prerequisites
 
 ThinkUtils requires a few system packages:

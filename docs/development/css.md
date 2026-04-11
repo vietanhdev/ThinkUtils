@@ -1,114 +1,73 @@
-# ThinkUtils CSS Architecture
-
-## Structure Overview
-
-```
-src/
-├── styles.css (Main entry point — imports all modules)
-└── styles/
-    ├── common.css          # Variables, reset, layout, navigation, buttons
-    ├── layouts.css         # Reusable layout components (cards, headers)
-    ├── home.css            # Home page dashboard
-    ├── fan.css             # Fan control interface
-    ├── battery.css         # Battery management
-    ├── performance.css     # CPU/Performance settings
-    ├── monitor.css         # System monitoring
-    ├── sync.css            # Settings sync
-    ├── system.css          # System information
-    ├── security.css        # Security features
-    ├── mcp.css             # MCP server management
-    ├── dialogs.css         # Modal dialogs
-    └── README.md           # Quick reference
-```
+# CSS Architecture
 
 ## Import Chain
 
-```
-index.html
-    └── styles.css
-        ├── common.css      (loaded first — contains variables)
-        ├── layouts.css     (reusable layout components)
-        ├── home.css
-        ├── fan.css
-        ├── battery.css
-        ├── performance.css
-        ├── monitor.css
-        ├── sync.css
-        ├── system.css
-        ├── security.css
-        ├── mcp.css
-        └── dialogs.css
-```
-
-## Component Mapping
-
-### Common Components (common.css)
-```
-┌─────────────────────────────────────┐
-│ Titlebar                            │
-├─────────────────────────────────────┤
-│ ┌──────┐ ┌────────────────────────┐│
-│ │      │ │                        ││
-│ │ Side │ │   Page Header          ││
-│ │ bar  │ │                        ││
-│ │      │ ├────────────────────────┤│
-│ │      │ │                        ││
-│ │      │ │   Content View         ││
-│ │      │ │   (page-specific CSS)  ││
-│ │      │ │                        ││
-│ └──────┘ └────────────────────────┘│
-└─────────────────────────────────────┘
+```mermaid
+graph TD
+    index.html --> styles.css
+    styles.css --> common.css["common.css<br/><small>Variables, reset, nav, buttons</small>"]
+    styles.css --> layouts.css["layouts.css<br/><small>Reusable layout components</small>"]
+    styles.css --> home.css
+    styles.css --> fan.css
+    styles.css --> battery.css
+    styles.css --> performance.css
+    styles.css --> monitor.css
+    styles.css --> sync.css
+    styles.css --> system.css
+    styles.css --> security.css
+    styles.css --> mcp.css
+    styles.css --> dialogs.css
 ```
 
-### Page-Specific Layouts
+## App Layout
 
-#### Home Page (home.css)
-```
-┌─────────────────────────────────────┐
-│ System Overview (Compact Cards)     │
-├─────────────────────────────────────┤
-│ Quick Actions Grid                  │
-├─────────────────────────────────────┤
-│ Quick Settings                      │
-├─────────────────────────────────────┤
-│ System Info                         │
-└─────────────────────────────────────┘
+```mermaid
+block-beta
+    columns 5
+    Titlebar:5
+    Sidebar:1 Content:4
+
+    style Titlebar fill:#333,color:#fff
+    style Sidebar fill:#1a1a1a,color:#fff
+    style Content fill:#242424,color:#fff
 ```
 
-#### Fan Control (fan.css)
-```
-┌──────────┬──────────────────────────┐
-│          │ Fan Mode Selection       │
-│  Status  ├──────────────────────────┤
-│ Sidebar  │ Manual Speed Slider      │
-│          ├──────────────────────────┤
-│          │ Fan Curve Editor         │
-└──────────┴──────────────────────────┘
-```
+The app uses a fixed sidebar + scrollable content area. Each page has its own CSS file scoped to that view.
 
-#### Battery (battery.css)
-```
-┌─────────────────────────────────────┐
-│ Battery Info Cards (Grid)           │
-├──────────────────┬──────────────────┤
-│ Threshold        │ Battery Tips     │
-│ Controls         │                  │
-└──────────────────┴──────────────────┘
-```
+### Page Layouts
 
-#### Monitor (monitor.css)
-```
-┌──────────────────┬──────────────────┐
-│ CPU Usage        │ Memory Usage     │
-├──────────────────┴──────────────────┤
-│ CPU Cores Grid                      │
-├─────────────────────────────────────┤
-│ Disk Usage List                     │
-├─────────────────────────────────────┤
-│ Network Stats                       │
-├─────────────────────────────────────┤
-│ Process Table                       │
-└─────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph home["Home (home.css)"]
+        H1[System Overview Cards]
+        H2[Quick Actions Grid]
+        H3[Quick Settings]
+        H4[System Info]
+        H1 --> H2 --> H3 --> H4
+    end
+
+    subgraph fan["Fan Control (fan.css)"]
+        direction LR
+        F1[Status Sidebar]
+        F2[Mode Selection + Slider + Curve Editor]
+    end
+
+    subgraph battery["Battery (battery.css)"]
+        B1[Battery Info Cards Grid]
+        B2[Threshold Controls]
+        B3[Battery Tips]
+        B1 --> B2
+        B1 --> B3
+    end
+
+    subgraph monitor["Monitor (monitor.css)"]
+        M1[CPU + Memory]
+        M2[CPU Cores Grid]
+        M3[Disk Usage]
+        M4[Network Stats]
+        M5[Process Table]
+        M1 --> M2 --> M3 --> M4 --> M5
+    end
 ```
 
 ## CSS Variables
@@ -144,14 +103,9 @@ index.html
 
 ## Responsive Breakpoints
 
-```
-Desktop (> 1200px)
-    ↓
-Tablet (768px - 1200px)
-    ↓
-Mobile (< 768px)
-    ↓
-Small Mobile (< 480px)
+```mermaid
+graph LR
+    A["Desktop<br/>> 1200px"] --> B["Tablet<br/>768–1200px"] --> C["Mobile<br/>< 768px"] --> D["Small Mobile<br/>< 480px"]
 ```
 
 ## Style Cascade

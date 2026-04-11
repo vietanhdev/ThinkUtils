@@ -29,9 +29,11 @@
     "htmlhint": "^1.1.4",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.6",
+    "mermaid": "^11.14.0",
     "prettier": "^3.2.5",
     "stylelint": "^16.2.1",
     "stylelint-config-standard": "^36.0.0",
-    "vitepress": "^1.6.4"
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.17"
   }
 }
