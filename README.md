@@ -11,9 +11,6 @@ A powerful, native desktop application that unlocks the full potential of your T
 ### Home Dashboard
 ![Home Dashboard](./screenshots/home.png)
 
-### Extended Home View
-![Extended Home](./screenshots/home_extended.png)
-
 ### Fan Control
 ![Fan Control](./screenshots/fan_control.png)
 
@@ -23,8 +20,17 @@ A powerful, native desktop application that unlocks the full potential of your T
 ### System Monitor
 ![System Monitor](./screenshots/system_monitor.png)
 
+### Battery
+![Battery](./screenshots/battery.png)
+
 ### System Information
 ![System Info](./screenshots/system_info.png)
+
+### Security
+![Security](./screenshots/security.png)
+
+### AI Integration
+![AI Integration](./screenshots/ai_integration.png)
 
 ### Settings Sync
 ![Settings Sync](./screenshots/settings_sync.png)

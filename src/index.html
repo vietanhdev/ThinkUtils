@@ -11,33 +11,35 @@
   </head>
 
   <body>
-    <!-- Titlebar Container (injected) -->
-    <div id="titlebar-container"></div>
+    <div class="window-container">
+      <!-- Titlebar Container (injected) -->
+      <div id="titlebar-container"></div>
 
-    <div class="app-layout">
-      <!-- Sidebar Container (injected) -->
-      <div id="sidebar-container"></div>
+      <div class="app-layout">
+        <!-- Sidebar Container (injected) -->
+        <div id="sidebar-container"></div>
 
-      <!-- Main Content Area -->
-      <main class="main-content">
-        <!-- Page Header -->
-        <header class="page-header">
-          <div class="page-title-section">
-            <h1 id="page-title">Home</h1>
-            <p id="page-subtitle">Quick settings and overview</p>
-          </div>
-          <div class="status-indicator" id="connection-status">
-            <span class="status-dot"></span>
-            <span class="status-text">Active</span>
-          </div>
-        </header>
+        <!-- Main Content Area -->
+        <main class="main-content">
+          <!-- Page Header -->
+          <header class="page-header">
+            <div class="page-title-section">
+              <h1 id="page-title">Home</h1>
+              <p id="page-subtitle">Quick settings and overview</p>
+            </div>
+            <div class="status-indicator" id="connection-status">
+              <span class="status-dot"></span>
+              <span class="status-text">Active</span>
+            </div>
+          </header>
 
-        <!-- Views Container (views injected dynamically) -->
-        <div id="views-container"></div>
-      </main>
+          <!-- Views Container (views injected dynamically) -->
+          <div id="views-container"></div>
+        </main>
+      </div>
+
+      <!-- Dialogs Container (injected) -->
+      <div id="dialogs-container"></div>
     </div>
-
-    <!-- Dialogs Container (injected) -->
-    <div id="dialogs-container"></div>
   </body>
 </html>
