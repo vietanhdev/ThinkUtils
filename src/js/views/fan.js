@@ -125,6 +125,17 @@ function updateUIFromFanLevel(level) {
 
   const levelStr = level.toString().toLowerCase();
 
+  // Detect external changes (e.g. from MCP server) by comparing the
+  // actual hardware level with what the UI last set. If they differ,
+  // clear the cache so the user can set the same mode again.
+  const lastSet = getState('lastFanSpeedSet');
+  if (lastSet !== null) {
+    const lastNormalized = lastSet === 'full-speed' ? 'disengaged' : lastSet;
+    if (levelStr !== lastNormalized) {
+      setState('lastFanSpeedSet', null);
+    }
+  }
+
   [elements.btnAuto, elements.btnManual, elements.btnCurve, elements.btnFull].forEach((btn) => {
     btn.classList.remove('active');
   });
