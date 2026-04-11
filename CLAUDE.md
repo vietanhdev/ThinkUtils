@@ -32,6 +32,14 @@ Version must be updated in all 4 files before release:
 
 After committing, tag with `git tag vX.Y.Z` and push the tag — the GitHub Actions workflow builds and publishes release artifacts automatically.
 
+After version bump, also run `cargo check` from `src-tauri/` to update `Cargo.lock`, and include it in the commit.
+
+## Local Build & Install
+
+```bash
+./scripts/upgrade.sh          # Build + install .deb in one step
+```
+
 ## Architecture
 
 **Tauri v2 app** with Rust backend and vanilla JavaScript frontend (no framework).
@@ -67,9 +75,14 @@ Frontend calls backend via `window.__TAURI__.core.invoke('command', {args})`. Ba
 
 ### Permission Model
 
-Two separate permission systems:
-1. **Fan permissions** (`fan_control.rs`): Checks direct write to `/proc/acpi/ibm/fan` OR existence of polkit rule at `/etc/polkit-1/rules.d/50-thinkutils.rules`. "Grant Permissions" button installs the polkit rule (one-time).
-2. **System permissions** (`permissions.rs`): chmod/chown on sysfs files for CPU/battery control. Runs at startup, persists within boot session.
+One unified setup (`permissions.rs::setup_permissions()`) handles everything in a single pkexec call:
+- Installs a dedicated fan helper at `/usr/local/bin/thinkutils-fan-control` (validates commands, persists across reboots)
+- Installs a tight polkit rule at `/etc/polkit-1/rules.d/50-thinkutils.rules` (only allows the helper, not arbitrary bash)
+- Sets sysfs file permissions for CPU/battery control (resets on reboot but non-critical)
+
+Permission checks use `Path::exists()` on the **helper binary** only — the polkit rules directory is root-only so the rule file can't be checked by non-root users.
+
+Performance settings (CPU governor, turbo boost) are NOT auto-applied on startup to avoid pkexec password prompts. Fan settings are only restored if the helper is already installed.
 
 ## Rules
 
