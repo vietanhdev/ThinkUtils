@@ -59,7 +59,7 @@ pub struct ApiResponse<T> {
 
 /// Create a temp script securely (O_EXCL prevents symlink attacks, random name, restricted perms)
 #[cfg(unix)]
-fn create_secure_temp_script(content: &str) -> Result<String, String> {
+pub fn create_secure_temp_script(content: &str) -> Result<String, String> {
     use std::io::Write;
     use std::os::unix::fs::OpenOptionsExt;
 
@@ -86,7 +86,7 @@ fn create_secure_temp_script(content: &str) -> Result<String, String> {
 }
 
 #[cfg(not(unix))]
-fn create_secure_temp_script(content: &str) -> Result<String, String> {
+pub fn create_secure_temp_script(content: &str) -> Result<String, String> {
     let random = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()

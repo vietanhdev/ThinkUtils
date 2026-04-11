@@ -35,6 +35,7 @@ export function initializeElements() {
   elements.performanceView = document.getElementById('performance-view');
   elements.monitorView = document.getElementById('monitor-view');
   elements.securityView = document.getElementById('security-view');
+  elements.mcpView = document.getElementById('mcp-view');
 
   // Sync
   elements.btnGoogleLogin = document.getElementById('btn-google-login');

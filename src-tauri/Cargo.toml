@@ -34,4 +34,7 @@ url = "2.5"
 tiny_http = "0.12"
 rand = "0.8"
 lazy_static = "1.4"
+rmcp = { version = "0.1", features = ["server", "transport-sse-server", "macros"] }
+schemars = "0.8"
+tokio-util = "0.7"
 

@@ -1,0 +1,156 @@
+<div class="view-header">
+  <h2>AI Integration</h2>
+  <p class="view-subtitle">Connect AI assistants to your ThinkPad via MCP</p>
+</div>
+
+<div class="mcp-container">
+  <!-- Status & Toggle -->
+  <div class="mcp-card">
+    <h3>MCP Server</h3>
+    <p class="mcp-description">
+      The MCP (Model Context Protocol) server lets AI assistants monitor and control your ThinkPad:
+      fan speed, battery, CPU, temperatures, and more.
+    </p>
+
+    <div class="mcp-settings-row">
+      <label>Host</label>
+      <input type="text" id="mcp-host" value="127.0.0.1" class="mcp-input" />
+      <label>Port</label>
+      <input type="number" id="mcp-port" value="8765" class="mcp-input mcp-input-port" />
+    </div>
+
+    <div class="mcp-status-row">
+      <div class="mcp-status">
+        <span class="status-dot" id="mcp-status-dot"></span>
+        <span id="mcp-status-text">Checking...</span>
+      </div>
+      <button class="btn-primary" id="btn-mcp-toggle">Start Server</button>
+    </div>
+  </div>
+
+  <!-- Available Tools -->
+  <div class="mcp-card">
+    <h3>Available Tools</h3>
+    <div class="mcp-tools-grid">
+      <div class="mcp-tool-item">
+        <strong>get_fan_status</strong>
+        <span>Fan speed (RPM), level, status</span>
+      </div>
+      <div class="mcp-tool-item">
+        <strong>set_fan_speed</strong>
+        <span>Set auto, full-speed, or level 0-7</span>
+      </div>
+      <div class="mcp-tool-item">
+        <strong>get_cpu_temperature</strong>
+        <span>All thermal zone readings</span>
+      </div>
+      <div class="mcp-tool-item">
+        <strong>get_battery_info</strong>
+        <span>Status, capacity, health, thresholds</span>
+      </div>
+      <div class="mcp-tool-item">
+        <strong>set_battery_thresholds</strong>
+        <span>Set charge start/stop percentages</span>
+      </div>
+      <div class="mcp-tool-item">
+        <strong>get_cpu_info</strong>
+        <span>Governor, frequency, turbo boost</span>
+      </div>
+      <div class="mcp-tool-item">
+        <strong>get_memory_info</strong>
+        <span>RAM usage details</span>
+      </div>
+      <div class="mcp-tool-item">
+        <strong>get_system_info</strong>
+        <span>Hostname, kernel, OS, CPU model</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Setup Instructions -->
+  <div class="mcp-card">
+    <h3>Setup Instructions</h3>
+    <p class="mcp-description">
+      Start the MCP server above, then add it to your AI tool. Server URL:
+      <code id="mcp-url-display">http://127.0.0.1:8765/sse</code>
+    </p>
+
+    <div class="mcp-tabs">
+      <button class="mcp-tab active" data-tab="claude-code">Claude Code</button>
+      <button class="mcp-tab" data-tab="claude-desktop">Claude Desktop</button>
+      <button class="mcp-tab" data-tab="chatgpt">ChatGPT</button>
+      <button class="mcp-tab" data-tab="cursor">Cursor / Windsurf</button>
+      <button class="mcp-tab" data-tab="other">Other</button>
+    </div>
+
+    <div class="mcp-tab-content active" id="tab-claude-code">
+      <p>Add to <code>~/.claude.json</code>:</p>
+      <pre class="mcp-config" id="config-claude-code">
+{
+  "mcpServers": {
+    "thinkutils": {
+      "url": "http://127.0.0.1:8765/sse"
+    }
+  }
+}</pre
+      >
+      <button class="btn-secondary btn-copy" data-target="tab-claude-code">Copy</button>
+    </div>
+
+    <div class="mcp-tab-content" id="tab-claude-desktop">
+      <p>
+        Add to
+        <code>~/.config/Claude/claude_desktop_config.json</code>:
+      </p>
+      <pre class="mcp-config" id="config-claude-desktop">
+{
+  "mcpServers": {
+    "thinkutils": {
+      "url": "http://127.0.0.1:8765/sse"
+    }
+  }
+}</pre
+      >
+      <button class="btn-secondary btn-copy" data-target="tab-claude-desktop">Copy</button>
+    </div>
+
+    <div class="mcp-tab-content" id="tab-chatgpt">
+      <p>
+        ChatGPT Desktop supports MCP servers. Go to
+        <strong>Settings &gt; Features &gt; MCP Servers</strong>, click <strong>Add</strong>, and
+        enter:
+      </p>
+      <pre class="mcp-config">
+Server URL: http://127.0.0.1:8765/sse
+Name: ThinkUtils</pre
+      >
+      <p class="mcp-note">Requires ChatGPT Desktop with MCP support (Plus/Team/Enterprise).</p>
+    </div>
+
+    <div class="mcp-tab-content" id="tab-cursor">
+      <p>
+        In Cursor or Windsurf, go to <strong>Settings &gt; MCP</strong> and add a new SSE server:
+      </p>
+      <pre class="mcp-config">
+Name: thinkutils
+URL: http://127.0.0.1:8765/sse
+Transport: SSE</pre
+      >
+    </div>
+
+    <div class="mcp-tab-content" id="tab-other">
+      <p>For any MCP-compatible client, configure an SSE server with:</p>
+      <pre class="mcp-config">
+URL: http://127.0.0.1:8765/sse
+Transport: SSE (Server-Sent Events)</pre
+      >
+      <p class="mcp-note">
+        Works with any tool supporting the
+        <a href="https://modelcontextprotocol.io" target="_blank" style="color: var(--red-primary)"
+          >Model Context Protocol</a
+        >
+        including LM Studio, Continue.dev, and other MCP clients.
+      </p>
+    </div>
+  </div>
+</div>

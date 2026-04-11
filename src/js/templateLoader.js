@@ -11,7 +11,8 @@ const TEMPLATES = {
   monitorView: '/templates/views/monitor.html',
   systemView: '/templates/views/system.html',
   syncView: '/templates/views/sync.html',
-  securityView: '/templates/views/security.html'
+  securityView: '/templates/views/security.html',
+  mcpView: '/templates/views/mcp.html'
 };
 
 /**
@@ -88,7 +89,8 @@ export function injectTemplates(templates) {
       { key: 'monitorView', id: 'monitor-view' },
       { key: 'systemView', id: 'system-view' },
       { key: 'syncView', id: 'sync-view' },
-      { key: 'securityView', id: 'security-view' }
+      { key: 'securityView', id: 'security-view' },
+      { key: 'mcpView', id: 'mcp-view' }
     ];
 
     viewTemplates.forEach(({ key, id }) => {
