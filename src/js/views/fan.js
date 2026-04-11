@@ -290,7 +290,7 @@ async function tryUpdatePermissions() {
     const response = await invoke('setup_permissions');
 
     if (response.success) {
-      showStatus('✓ All permissions granted!', 'success');
+      showStatus('✓ Permissions granted! Please restart for full effect.', 'success');
       elements.permissionHelper.style.display = 'none';
     } else {
       showStatus(`Failed: ${response.error}`, 'error');

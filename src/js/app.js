@@ -62,9 +62,10 @@ async function setupPermissions() {
     if (response.success) {
       console.log('[Permissions] ✓ Setup successful');
       hidePermissionDialog();
-      // Re-check fan permissions since setup_permissions also installs
-      // the fan helper + polkit rule, so the fan page helper can be hidden
       await checkInitialPermissions();
+      alert(
+        'Permissions configured successfully!\n\nPlease restart ThinkUtils for all changes to take effect.'
+      );
       return true;
     } else {
       console.error('[Permissions] ✗ Setup failed:', response.error);
