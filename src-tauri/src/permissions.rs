@@ -60,6 +60,15 @@ pub async fn setup_permissions() -> ApiResponse<String> {
 
     let username = std::env::var("USER").unwrap_or_else(|_| "root".to_string());
 
+    // Validate username to prevent command injection (only allow alphanumeric, dash, underscore)
+    if !username.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+        return ApiResponse {
+            success: false,
+            data: None,
+            error: Some("Invalid username detected".to_string()),
+        };
+    }
+
     // Create a script that sets up all permissions
     let mut script_lines = vec![
         "#!/bin/bash".to_string(),
@@ -90,33 +99,65 @@ pub async fn setup_permissions() -> ApiResponse<String> {
     script_lines.push("exit 0".to_string());
 
     let script_content = script_lines.join("\n");
-    let temp_script = "/tmp/thinkutils_setup_perms.sh";
 
-    if let Err(e) = fs::write(temp_script, script_content) {
-        return ApiResponse {
-            success: false,
-            data: None,
-            error: Some(format!("Failed to create setup script: {}", e)),
-        };
-    }
+    // Secure temp file creation (random name, O_EXCL to prevent symlink attacks)
+    let random = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let temp_script = format!("/tmp/thinkutils_perms_{}.sh", random);
 
-    // Make it executable
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::Permissions::from_mode(0o755);
-        let _ = fs::set_permissions(temp_script, perms);
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+
+        let mut file = match fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .mode(0o700)
+            .open(&temp_script)
+        {
+            Ok(f) => f,
+            Err(e) => {
+                return ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some(format!("Failed to create setup script: {}", e)),
+                };
+            }
+        };
+
+        if let Err(e) = file.write_all(script_content.as_bytes()) {
+            let _ = fs::remove_file(&temp_script);
+            return ApiResponse {
+                success: false,
+                data: None,
+                error: Some(format!("Failed to write setup script: {}", e)),
+            };
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        if let Err(e) = fs::write(&temp_script, &script_content) {
+            return ApiResponse {
+                success: false,
+                data: None,
+                error: Some(format!("Failed to create setup script: {}", e)),
+            };
+        }
     }
 
     // Run with pkexec - this will prompt for password once
     match tokio::process::Command::new("pkexec")
         .arg("bash")
-        .arg(temp_script)
+        .arg(&temp_script)
         .output()
         .await
     {
         Ok(output) => {
-            let _ = fs::remove_file(temp_script);
+            let _ = fs::remove_file(&temp_script);
 
             if output.status.success() {
                 println!("[Permissions] ✓ Permissions setup successful");
@@ -136,7 +177,7 @@ pub async fn setup_permissions() -> ApiResponse<String> {
             }
         }
         Err(e) => {
-            let _ = fs::remove_file(temp_script);
+            let _ = fs::remove_file(&temp_script);
             println!("[Permissions] ✗ Failed to execute pkexec: {}", e);
             ApiResponse {
                 success: false,

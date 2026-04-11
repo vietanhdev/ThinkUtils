@@ -75,6 +75,15 @@ export async function startCurveMode() {
       });
     }
 
+    // Listen for permission errors from background task
+    if (!window.fanCurveErrorUnlisten) {
+      window.fanCurveErrorUnlisten = await listen('fan-curve-error', (event) => {
+        const { error } = event.payload;
+        console.error('[Fan Curve] Backend error:', error);
+        showStatus(`Fan curve error: ${error}`, 'error');
+      });
+    }
+
     console.log('[Fan Curve] Started - backend will handle temperature monitoring');
   } catch (error) {
     console.error('[Fan Curve] Failed to start:', error);
@@ -90,6 +99,10 @@ export async function stopCurveMode() {
     if (window.fanCurveUnlisten) {
       window.fanCurveUnlisten();
       window.fanCurveUnlisten = null;
+    }
+    if (window.fanCurveErrorUnlisten) {
+      window.fanCurveErrorUnlisten();
+      window.fanCurveErrorUnlisten = null;
     }
 
     console.log('[Fan Curve] Stopped');

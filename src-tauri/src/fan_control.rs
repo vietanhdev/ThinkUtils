@@ -5,6 +5,44 @@ use std::process::Command;
 use regex::Regex;
 
 const PROC_FAN: &str = "/proc/acpi/ibm/fan";
+const HELPER_PATH: &str = "/usr/local/bin/thinkutils-fan-control";
+const POLKIT_RULE_PATH: &str = "/etc/polkit-1/rules.d/50-thinkutils.rules";
+
+/// Dedicated fan control helper script - validates input before writing to fan.
+/// Installed at HELPER_PATH by update_permissions().
+const HELPER_SCRIPT: &str = r#"#!/bin/bash
+set -e
+FAN="/proc/acpi/ibm/fan"
+case "$1" in
+    "level auto"|"level full-speed"|"level 0"|"level 1"|"level 2"|"level 3"|"level 4"|"level 5"|"level 6"|"level 7")
+        echo "$1" > "$FAN"
+        ;;
+    *)
+        echo "Invalid command" >&2
+        exit 1
+        ;;
+esac
+"#;
+
+/// Polkit rule that only allows the dedicated helper script without password.
+/// Much tighter than allowing arbitrary bash execution.
+const POLKIT_RULE: &str = r#"/* ThinkUtils: Allow passwordless fan control via dedicated helper only */
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.policykit.exec") {
+        var program = action.lookup("program");
+        if (program == "/usr/local/bin/thinkutils-fan-control") {
+            if (subject.isInGroup("wheel") || subject.isInGroup("sudo")) {
+                return polkit.Result.YES;
+            }
+        }
+    }
+});
+"#;
+
+/// Valid fan speed values (whitelist)
+const VALID_SPEEDS: &[&str] = &[
+    "auto", "full-speed", "0", "1", "2", "3", "4", "5", "6", "7",
+];
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SensorData {
@@ -17,6 +55,46 @@ pub struct ApiResponse<T> {
     pub success: bool,
     pub data: Option<T>,
     pub error: Option<String>,
+}
+
+/// Create a temp script securely (O_EXCL prevents symlink attacks, random name, restricted perms)
+#[cfg(unix)]
+fn create_secure_temp_script(content: &str) -> Result<String, String> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let random = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let path = format!("/tmp/thinkutils_{}.sh", random);
+
+    let mut file = fs::OpenOptions::new()
+        .create_new(true) // O_EXCL: fail if exists, don't follow symlinks
+        .write(true)
+        .mode(0o700) // Only owner can read/write/execute
+        .open(&path)
+        .map_err(|e| format!("Failed to create temp script: {}", e))?;
+
+    file.write_all(content.as_bytes())
+        .map_err(|e| {
+            let _ = fs::remove_file(&path);
+            format!("Failed to write temp script: {}", e)
+        })?;
+
+    Ok(path)
+}
+
+#[cfg(not(unix))]
+fn create_secure_temp_script(content: &str) -> Result<String, String> {
+    let random = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let path = format!("/tmp/thinkutils_{}.sh", random);
+    fs::write(&path, content)
+        .map_err(|e| format!("Failed to create temp script: {}", e))?;
+    Ok(path)
 }
 
 #[tauri::command]
@@ -100,74 +178,110 @@ pub fn get_sensor_data() -> ApiResponse<SensorData> {
 
 #[tauri::command]
 pub async fn set_fan_speed(speed: String) -> ApiResponse<String> {
+    // Validate speed against whitelist
+    if !VALID_SPEEDS.contains(&speed.as_str()) {
+        return ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Invalid fan speed: {}", speed)),
+        };
+    }
+
     println!("[Fan] Setting speed to: {}", speed);
     let command_str = format!("level {}", speed);
 
-    match fs::write(PROC_FAN, &command_str) {
-        Ok(_) => {
-            println!("[Fan] ✓ Speed set successfully");
-            return ApiResponse {
-                success: true,
-                data: Some(format!("Fan speed set to: {}", speed)),
-                error: None,
-            };
-        }
-        Err(_) => {
-            println!("[Fan] Need elevated permissions");
+    // 1. Try direct write (no elevation needed)
+    if fs::write(PROC_FAN, &command_str).is_ok() {
+        println!("[Fan] ✓ Speed set successfully");
+        return ApiResponse {
+            success: true,
+            data: Some(format!("Fan speed set to: {}", speed)),
+            error: None,
+        };
+    }
 
-            let temp_script = format!("/tmp/thinkfan_set_speed_{}.sh", std::process::id());
-            let script_content = format!(
-                "#!/bin/bash\nset -e\necho '{}' > {}\nexit 0\n",
-                command_str, PROC_FAN
-            );
+    println!("[Fan] Need elevated permissions");
 
-            if let Err(e) = fs::write(&temp_script, script_content) {
+    // 2. Use dedicated helper if installed (passwordless via polkit rule)
+    if std::path::Path::new(HELPER_PATH).exists() {
+        match tokio::process::Command::new("pkexec")
+            .arg(HELPER_PATH)
+            .arg(&command_str)
+            .output()
+            .await
+        {
+            Ok(output) if output.status.success() => {
+                println!("[Fan] ✓ Speed set via helper");
+                return ApiResponse {
+                    success: true,
+                    data: Some(format!("Fan speed set to: {}", speed)),
+                    error: None,
+                };
+            }
+            Ok(_) => {
                 return ApiResponse {
                     success: false,
                     data: None,
-                    error: Some(format!("Failed to create temp script: {}", e)),
+                    error: Some("Permission denied. Click 'Grant Permissions' to enable passwordless fan control.".to_string()),
                 };
             }
-
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let perms = std::fs::Permissions::from_mode(0o755);
-                let _ = fs::set_permissions(&temp_script, perms);
+            Err(e) => {
+                return ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some(format!("Failed to execute helper: {}", e)),
+                };
             }
+        }
+    }
 
-            match tokio::process::Command::new("pkexec")
-                .arg("bash")
-                .arg(&temp_script)
-                .output()
-                .await
-            {
-                Ok(output) => {
-                    let _ = fs::remove_file(&temp_script);
+    // 3. Fallback: secure temp script + pkexec (will prompt for password)
+    let script_content = format!(
+        "#!/bin/bash\nset -e\necho '{}' > {}\nexit 0\n",
+        command_str, PROC_FAN
+    );
 
-                    if output.status.success() {
-                        println!("[Fan] ✓ Speed set via pkexec");
-                        return ApiResponse {
-                            success: true,
-                            data: Some(format!("Fan speed set to: {}", speed)),
-                            error: None,
-                        };
-                    } else {
-                        return ApiResponse {
-                            success: false,
-                            data: None,
-                            error: Some("Permission denied. Click 'Grant Permissions' to avoid repeated password prompts.".to_string()),
-                        };
-                    }
+    let temp_script = match create_secure_temp_script(&script_content) {
+        Ok(path) => path,
+        Err(e) => {
+            return ApiResponse {
+                success: false,
+                data: None,
+                error: Some(e),
+            };
+        }
+    };
+
+    match tokio::process::Command::new("pkexec")
+        .arg("bash")
+        .arg(&temp_script)
+        .output()
+        .await
+    {
+        Ok(output) => {
+            let _ = fs::remove_file(&temp_script);
+
+            if output.status.success() {
+                println!("[Fan] ✓ Speed set via pkexec");
+                ApiResponse {
+                    success: true,
+                    data: Some(format!("Fan speed set to: {}", speed)),
+                    error: None,
                 }
-                Err(e) => {
-                    let _ = fs::remove_file(&temp_script);
-                    return ApiResponse {
-                        success: false,
-                        data: None,
-                        error: Some(format!("Failed to execute pkexec: {}", e)),
-                    };
+            } else {
+                ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Permission denied. Click 'Grant Permissions' to avoid repeated password prompts.".to_string()),
                 }
+            }
+        }
+        Err(e) => {
+            let _ = fs::remove_file(&temp_script);
+            ApiResponse {
+                success: false,
+                data: None,
+                error: Some(format!("Failed to execute pkexec: {}", e)),
             }
         }
     }
@@ -175,9 +289,14 @@ pub async fn set_fan_speed(speed: String) -> ApiResponse<String> {
 
 #[tauri::command]
 pub fn check_permissions() -> ApiResponse<bool> {
-    let has_permission = fs::metadata(PROC_FAN)
-        .and_then(|_| fs::OpenOptions::new().write(true).open(PROC_FAN))
-        .is_ok();
+    // Check if direct write is possible
+    let direct_write = fs::OpenOptions::new().write(true).open(PROC_FAN).is_ok();
+
+    // Check if the dedicated helper and polkit rule are both installed
+    let helper_installed = std::path::Path::new(HELPER_PATH).exists()
+        && std::path::Path::new(POLKIT_RULE_PATH).exists();
+
+    let has_permission = direct_write || helper_installed;
 
     ApiResponse {
         success: true,
@@ -188,55 +307,70 @@ pub fn check_permissions() -> ApiResponse<bool> {
 
 #[tauri::command]
 pub async fn update_permissions() -> ApiResponse<String> {
-    println!("[Permissions] Updating permissions for {}", PROC_FAN);
+    println!("[Permissions] Installing fan control helper and polkit rule");
 
-    let username = std::env::var("USER").unwrap_or_else(|_| "root".to_string());
+    // Build an install script that:
+    // 1. Installs a dedicated fan control helper with input validation
+    // 2. Installs a tight polkit rule that only allows that specific helper
+    let lines: Vec<String> = vec![
+        "#!/bin/bash".into(),
+        "set -e".into(),
+        format!("cat > {} << 'HELPEREOF'", HELPER_PATH),
+        HELPER_SCRIPT.trim().into(),
+        "HELPEREOF".into(),
+        format!("chmod 755 {}", HELPER_PATH),
+        "mkdir -p /etc/polkit-1/rules.d".into(),
+        format!("cat > {} << 'RULEEOF'", POLKIT_RULE_PATH),
+        POLKIT_RULE.trim().into(),
+        "RULEEOF".into(),
+        "systemctl reload polkit 2>/dev/null || killall -HUP polkitd 2>/dev/null || true".into(),
+        "exit 0".into(),
+    ];
+    let script_content = lines.join("\n");
 
-    let result = tokio::process::Command::new("pkexec")
-        .arg("chown")
-        .arg(&username)
-        .arg(PROC_FAN)
+    let temp_script = match create_secure_temp_script(&script_content) {
+        Ok(path) => path,
+        Err(e) => {
+            return ApiResponse {
+                success: false,
+                data: None,
+                error: Some(e),
+            };
+        }
+    };
+
+    match tokio::process::Command::new("pkexec")
+        .arg("bash")
+        .arg(&temp_script)
         .output()
-        .await;
-
-    match result {
+        .await
+    {
         Ok(output) => {
+            let _ = fs::remove_file(&temp_script);
+
             if output.status.success() {
+                println!("[Permissions] ✓ Helper and polkit rule installed successfully");
                 ApiResponse {
                     success: true,
-                    data: Some("Permissions updated successfully".to_string()),
+                    data: Some("Permissions configured successfully. Fan control will now work without repeated prompts.".to_string()),
                     error: None,
                 }
             } else {
-                let chmod_result = tokio::process::Command::new("pkexec")
-                    .arg("chmod")
-                    .arg("666")
-                    .arg(PROC_FAN)
-                    .output()
-                    .await;
-
-                match chmod_result {
-                    Ok(chmod_output) if chmod_output.status.success() => {
-                        ApiResponse {
-                            success: true,
-                            data: Some("Permissions updated via chmod".to_string()),
-                            error: None,
-                        }
-                    }
-                    _ => {
-                        ApiResponse {
-                            success: false,
-                            data: None,
-                            error: Some("Failed to update permissions".to_string()),
-                        }
-                    }
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some(format!("Failed to install permissions: {}", stderr)),
                 }
             }
         }
-        Err(e) => ApiResponse {
-            success: false,
-            data: None,
-            error: Some(format!("Failed to run pkexec: {}", e)),
-        },
+        Err(e) => {
+            let _ = fs::remove_file(&temp_script);
+            ApiResponse {
+                success: false,
+                data: None,
+                error: Some(format!("Failed to run pkexec: {}", e)),
+            }
+        }
     }
 }

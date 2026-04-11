@@ -159,6 +159,12 @@ async function setFanMode(mode, level = null) {
     return;
   }
 
+  // When leaving curve mode, reset the speed cache since the background task
+  // may have changed the fan level independently
+  if (getState('currentFanMode') === 'curve' && mode !== 'curve') {
+    setState('lastFanSpeedSet', null);
+  }
+
   setState('currentFanMode', mode);
 
   [elements.btnAuto, elements.btnManual, elements.btnCurve, elements.btnFull].forEach((btn) => {
@@ -285,7 +291,6 @@ async function tryUpdatePermissions() {
     if (response.success) {
       showStatus('✓ Permissions granted!', 'success');
       elements.permissionHelper.style.display = 'none';
-      await checkInitialPermissions();
     } else {
       showStatus(`Failed: ${response.error}`, 'error');
     }
