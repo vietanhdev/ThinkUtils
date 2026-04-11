@@ -4,69 +4,30 @@
 
 ```mermaid
 graph TD
-    index.html --> styles.css
-    styles.css --> common.css["common.css<br/><small>Variables, reset, nav, buttons</small>"]
-    styles.css --> layouts.css["layouts.css<br/><small>Reusable layout components</small>"]
-    styles.css --> home.css
-    styles.css --> fan.css
-    styles.css --> battery.css
-    styles.css --> performance.css
-    styles.css --> monitor.css
-    styles.css --> sync.css
-    styles.css --> system.css
-    styles.css --> security.css
-    styles.css --> mcp.css
-    styles.css --> dialogs.css
+    A["index.html"] --> B["styles.css"]
+    B --> C["common.css — variables, reset, nav"]
+    B --> D["layouts.css — cards, headers"]
+    B --> E["home.css"]
+    B --> F["fan.css"]
+    B --> G["battery.css"]
+    B --> H["performance.css"]
+    B --> I["monitor.css"]
+    B --> J["sync.css"]
+    B --> K["system.css"]
+    B --> L["security.css"]
+    B --> M["mcp.css"]
+    B --> N["dialogs.css"]
 ```
 
 ## App Layout
 
-```mermaid
-block-beta
-    columns 5
-    Titlebar:5
-    Sidebar:1 Content:4
-
-    style Titlebar fill:#333,color:#fff
-    style Sidebar fill:#1a1a1a,color:#fff
-    style Content fill:#242424,color:#fff
-```
-
-The app uses a fixed sidebar + scrollable content area. Each page has its own CSS file scoped to that view.
-
-### Page Layouts
+The app uses a fixed sidebar with a scrollable content area. Each page has its own CSS file scoped to that view.
 
 ```mermaid
-graph TD
-    subgraph home["Home (home.css)"]
-        H1[System Overview Cards]
-        H2[Quick Actions Grid]
-        H3[Quick Settings]
-        H4[System Info]
-        H1 --> H2 --> H3 --> H4
-    end
-
-    subgraph fan["Fan Control (fan.css)"]
-        direction LR
-        F1[Status Sidebar]
-        F2[Mode Selection + Slider + Curve Editor]
-    end
-
-    subgraph battery["Battery (battery.css)"]
-        B1[Battery Info Cards Grid]
-        B2[Threshold Controls]
-        B3[Battery Tips]
-        B1 --> B2
-        B1 --> B3
-    end
-
-    subgraph monitor["Monitor (monitor.css)"]
-        M1[CPU + Memory]
-        M2[CPU Cores Grid]
-        M3[Disk Usage]
-        M4[Network Stats]
-        M5[Process Table]
-        M1 --> M2 --> M3 --> M4 --> M5
+graph LR
+    subgraph Window
+        Titlebar
+        Sidebar --> Content["Content View\n(page-specific CSS)"]
     end
 ```
 
@@ -103,10 +64,12 @@ graph TD
 
 ## Responsive Breakpoints
 
-```mermaid
-graph LR
-    A["Desktop<br/>> 1200px"] --> B["Tablet<br/>768–1200px"] --> C["Mobile<br/>< 768px"] --> D["Small Mobile<br/>< 480px"]
-```
+| Breakpoint | Width |
+|------------|-------|
+| Desktop | > 1200px |
+| Tablet | 768–1200px |
+| Mobile | < 768px |
+| Small Mobile | < 480px |
 
 ## Style Cascade
 

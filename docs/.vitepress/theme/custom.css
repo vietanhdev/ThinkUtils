@@ -69,3 +69,15 @@
 .dark .vp-doc img {
   box-shadow: 0 4px 16px rgb(0 0 0 / 30%);
 }
+
+/* Mermaid diagrams — constrain size and center */
+.mermaid {
+  display: flex;
+  justify-content: center;
+  margin: 1.5rem 0;
+}
+
+.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}

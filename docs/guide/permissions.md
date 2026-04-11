@@ -25,20 +25,16 @@ For users in the sudo/wheel group who want zero password prompts:
 
 ```mermaid
 flowchart TD
-    A["App Launch"] --> B{"Helper binary<br/>installed?"}
-    B -->|Yes| C["Fan control ready"]
-    B -->|No| D["Show Setup dialog"]
-    D --> E["User clicks Setup Permissions"]
+    A["App Launch"] --> B{"Fan helper\ninstalled?"}
+    B -- Yes --> C["✅ Fan control ready"]
+    B -- No --> D["Show Setup dialog"]
+    D --> E["User clicks Setup"]
     E --> F["pkexec — one password prompt"]
-    F --> G["Install fan helper<br/>/usr/local/bin/thinkutils-fan-control"]
-    F --> H["Install polkit rule<br/>/etc/polkit-1/rules.d/"]
-    F --> I["Set sysfs permissions<br/>chmod 666"]
-    G --> J["Persists across reboots"]
-    H --> J
-    I --> K["Resets on reboot"]
-
-    style J fill:#2d5a27,color:#fff
-    style K fill:#8b4513,color:#fff
+    F --> G["Install fan helper"]
+    F --> H["Install polkit rule"]
+    F --> I["Set sysfs permissions"]
+    G & H --> J["✅ Persists across reboots"]
+    I --> K["⚠️ Resets on reboot"]
 ```
 
 ## What Gets Configured

@@ -5,36 +5,14 @@ ThinkUtils is a **Tauri v2** app with a Rust backend and vanilla JavaScript fron
 ## Overview
 
 ```mermaid
-graph TB
-    subgraph Frontend["Frontend (src/)"]
-        direction LR
-        HTML["HTML + CSS"]
-        JS["Vanilla JavaScript"]
-    end
-
-    subgraph IPC["Tauri IPC Bridge"]
-        Invoke["invoke('command', args)"]
-        Emit["emit_to('main', event, payload)"]
-    end
-
-    subgraph Backend["Backend (src-tauri/src/)"]
-        direction LR
-        Rust["Rust Modules"]
-        API["ApiResponse&lt;T&gt;"]
-    end
-
-    subgraph System["Linux System"]
-        direction LR
-        Sysfs["/sys/**"]
-        Proc["/proc/acpi/ibm/fan"]
-        Sensors["lm-sensors"]
-        Pkexec["pkexec"]
-    end
-
-    Frontend -->|"invoke()"| IPC
-    IPC -->|"emit_to()"| Frontend
-    IPC --> Backend
-    Backend --> System
+graph LR
+    Frontend["🖥️ Frontend\nVanilla JS + HTML + CSS"] -->|"invoke(cmd, args)"| Tauri["⚡ Tauri IPC"]
+    Tauri -->|"emit(event, payload)"| Frontend
+    Tauri --> Backend["⚙️ Rust Backend\nApiResponse&lt;T&gt;"]
+    Backend --> Sysfs["/sys/**"]
+    Backend --> Proc["/proc/acpi/ibm/fan"]
+    Backend --> Sensors["lm-sensors"]
+    Backend --> Pkexec["pkexec"]
 ```
 
 ## Backend (Rust)
@@ -43,53 +21,39 @@ All Tauri commands return `ApiResponse<T> { success, data, error }` for consiste
 
 ### Modules
 
-```mermaid
-graph LR
-    subgraph Core
-        lib.rs["lib.rs<br/><small>Command registration</small>"]
-        permissions.rs["permissions.rs<br/><small>One-time setup</small>"]
-        settings.rs["settings.rs<br/><small>Persistent storage</small>"]
-    end
+| Module | Purpose |
+|--------|---------|
+| `fan_control.rs` | Manual fan speed via `/proc/acpi/ibm/fan` |
+| `fan_curve.rs` | Temperature-based auto fan control (background task, runs every 2s) |
+| `battery.rs` | Reads `/sys/class/power_supply/BAT0\|BAT1/` |
+| `performance.rs` | CPU governor, turbo boost, power profiles via sysfs |
+| `monitor.rs` | System stats (CPU, memory, disk, network, processes) |
+| `permissions.rs` | One-time permission setup via pkexec |
+| `security.rs` | ClamAV integration |
+| `sync.rs` | Google OAuth2 + Drive-based settings backup/restore |
+| `settings.rs` | Persistent storage via tauri-plugin-store |
+| `system_info.rs` | Hardware information |
+| `auth.rs` | OAuth helpers |
+| `mcp.rs` | MCP server for AI integration |
 
-    subgraph Hardware
-        fan_control.rs["fan_control.rs<br/><small>Manual fan speed</small>"]
-        fan_curve.rs["fan_curve.rs<br/><small>Auto fan curve</small>"]
-        battery.rs["battery.rs<br/><small>Battery info</small>"]
-        performance.rs["performance.rs<br/><small>CPU governor</small>"]
-    end
-
-    subgraph Monitoring
-        monitor.rs["monitor.rs<br/><small>System stats</small>"]
-        system_info.rs["system_info.rs<br/><small>Hardware info</small>"]
-        security.rs["security.rs<br/><small>ClamAV</small>"]
-    end
-
-    subgraph Services
-        sync.rs["sync.rs<br/><small>Google Drive</small>"]
-        auth.rs["auth.rs<br/><small>OAuth helpers</small>"]
-        mcp.rs["mcp.rs<br/><small>MCP server</small>"]
-    end
-```
-
-### Communication Patterns
+### Communication Pattern
 
 ```mermaid
 sequenceDiagram
-    participant F as Frontend (JS)
+    participant F as Frontend
     participant T as Tauri IPC
-    participant B as Backend (Rust)
-    participant S as System
+    participant B as Rust Backend
+    participant S as Linux System
 
     F->>T: invoke('set_fan_level', {level: 5})
-    T->>B: Call Rust handler
+    T->>B: Call handler
     B->>S: Write to /proc/acpi/ibm/fan
     S-->>B: OK
     B-->>T: ApiResponse { success: true }
     T-->>F: Promise resolves
 
-    Note over B,F: Backend can also push events
-    B->>T: emit_to("main", "fan-update", data)
-    T->>F: Event listener fires
+    Note over B,F: Backend can push events too
+    B-)F: emit("fan-update", data)
 ```
 
 ## Frontend (JavaScript)
@@ -115,17 +79,16 @@ One JS file per feature: `home.js`, `fan.js`, `battery.js`, `performance.js`, `m
 
 ```mermaid
 flowchart TD
-    A[App Launch] --> B{Helper binary exists?}
-    B -->|Yes| C[Fan control works immediately]
-    B -->|No| D[Show Setup Permissions dialog]
-    D --> E[User clicks Setup]
-    E --> F["pkexec runs setup script (one password prompt)"]
-    F --> G[Install fan helper binary]
-    F --> H[Install polkit rule]
-    F --> I[Set sysfs permissions]
-    G --> C
-    H --> C
-    I --> J[CPU/battery controls work]
+    A["App Launch"] --> B{"Fan helper\ninstalled?"}
+    B -- Yes --> C["✅ Fan control ready"]
+    B -- No --> D["Show Setup dialog"]
+    D --> E["User clicks Setup"]
+    E --> F["pkexec — one password prompt"]
+    F --> G["Install fan helper"]
+    F --> H["Install polkit rule"]
+    F --> I["Set sysfs permissions"]
+    G & H --> J["✅ Persists across reboots"]
+    I --> K["⚠️ Resets on reboot"]
 ```
 
 See [Permissions](/guide/permissions) for user-facing details.
