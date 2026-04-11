@@ -84,17 +84,22 @@
     </div>
 
     <div class="mcp-tab-content active" id="tab-claude-code">
-      <p>Add to <code>~/.claude.json</code>:</p>
+      <p>Run this command:</p>
+      <pre class="mcp-config">
+claude mcp add --transport sse thinkutils http://127.0.0.1:8765/sse</pre
+      >
+      <button class="btn-secondary btn-copy" data-target="tab-claude-code">Copy</button>
+      <p class="mcp-note">Or add to <code>.mcp.json</code> in your project:</p>
       <pre class="mcp-config" id="config-claude-code">
 {
   "mcpServers": {
     "thinkutils": {
+      "type": "sse",
       "url": "http://127.0.0.1:8765/sse"
     }
   }
 }</pre
       >
-      <button class="btn-secondary btn-copy" data-target="tab-claude-code">Copy</button>
     </div>
 
     <div class="mcp-tab-content" id="tab-claude-desktop">
@@ -106,6 +111,7 @@
 {
   "mcpServers": {
     "thinkutils": {
+      "type": "sse",
       "url": "http://127.0.0.1:8765/sse"
     }
   }
