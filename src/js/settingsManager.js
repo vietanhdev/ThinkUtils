@@ -83,23 +83,31 @@ export async function applyFanSettings(settings) {
 }
 
 /**
- * Apply battery settings
+ * Apply battery settings — reads actual thresholds from hardware
+ * rather than relying on cached settings, since external tools
+ * (e.g. MCP server) may have changed thresholds.
  */
-export async function applyBatterySettings(settings) {
+export async function applyBatterySettings() {
   const elements = (await import('./dom.js')).elements;
 
-  if (elements.thresholdStart) {
-    elements.thresholdStart.value = settings.battery_start_threshold;
-    if (elements.thresholdStartValue) {
-      elements.thresholdStartValue.textContent = settings.battery_start_threshold + '%';
+  try {
+    const response = await invoke('get_battery_thresholds');
+    if (response.success && response.data) {
+      if (elements.thresholdStart) {
+        elements.thresholdStart.value = response.data.start;
+        if (elements.thresholdStartValue) {
+          elements.thresholdStartValue.textContent = response.data.start + '%';
+        }
+      }
+      if (elements.thresholdStop) {
+        elements.thresholdStop.value = response.data.stop;
+        if (elements.thresholdStopValue) {
+          elements.thresholdStopValue.textContent = response.data.stop + '%';
+        }
+      }
     }
-  }
-
-  if (elements.thresholdStop) {
-    elements.thresholdStop.value = settings.battery_stop_threshold;
-    if (elements.thresholdStopValue) {
-      elements.thresholdStopValue.textContent = settings.battery_stop_threshold + '%';
-    }
+  } catch (error) {
+    console.error('[Settings] Failed to read battery thresholds:', error);
   }
 }
 
@@ -150,7 +158,7 @@ export async function applyAllSettings(settings) {
   // Performance settings (CPU governor, turbo boost, power profile) are NOT
   // auto-applied because they use pkexec which would prompt for a password
   // every time the app starts. Users apply these explicitly from the UI.
-  await applyBatterySettings(settings);
+  await applyBatterySettings();
   await applyFanSettings(settings);
 
   console.log('[Settings] All settings applied');
