@@ -292,9 +292,10 @@ pub fn check_permissions() -> ApiResponse<bool> {
     // Check if direct write is possible
     let direct_write = fs::OpenOptions::new().write(true).open(PROC_FAN).is_ok();
 
-    // Check if the dedicated helper and polkit rule are both installed
-    let helper_installed = std::path::Path::new(HELPER_PATH).exists()
-        && std::path::Path::new(POLKIT_RULE_PATH).exists();
+    // Check if the dedicated helper is installed (installed alongside the polkit rule).
+    // We only check the helper because /etc/polkit-1/rules.d/ is root-only,
+    // so Path::exists() on the polkit rule always fails for normal users.
+    let helper_installed = std::path::Path::new(HELPER_PATH).exists();
 
     let has_permission = direct_write || helper_installed;
 

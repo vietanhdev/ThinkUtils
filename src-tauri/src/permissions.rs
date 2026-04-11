@@ -45,7 +45,9 @@ pub async fn check_permissions_status() -> ApiResponse<PermissionStatus> {
     }
 
     // Also check if fan control helper + polkit rule are installed
-    if !Path::new(HELPER_PATH).exists() || !Path::new(POLKIT_RULE_PATH).exists() {
+    // Only check the helper — /etc/polkit-1/rules.d/ is root-only so
+    // Path::exists() on the polkit rule always fails for normal users.
+    if !Path::new(HELPER_PATH).exists() {
         // Can we at least write to the fan file directly?
         let fan_path = "/proc/acpi/ibm/fan";
         if Path::new(fan_path).exists() {

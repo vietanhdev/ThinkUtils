@@ -211,7 +211,6 @@ fn get_cpu_temperature() -> Result<i32, String> {
 }
 
 const HELPER_PATH: &str = "/usr/local/bin/thinkutils-fan-control";
-const POLKIT_RULE_PATH: &str = "/etc/polkit-1/rules.d/50-thinkutils.rules";
 
 /// Set fan speed with pkexec fallback using the dedicated helper script.
 /// Only attempts pkexec if the helper and polkit rule are both installed
@@ -235,12 +234,9 @@ async fn set_fan_speed_internal(level: i32) -> Result<(), String> {
         }
     }
 
-    // Use dedicated helper if installed (passwordless via polkit rule).
-    // Without helper+rule, we can't use pkexec from a background task
-    // because it would pop up a password dialog every 2 seconds.
-    if !std::path::Path::new(HELPER_PATH).exists()
-        || !std::path::Path::new(POLKIT_RULE_PATH).exists()
-    {
+    // Use dedicated helper if installed (polkit rule grants passwordless access).
+    // We only check the helper because /etc/polkit-1/rules.d/ is root-only.
+    if !std::path::Path::new(HELPER_PATH).exists() {
         return Err("No write permission. Grant permissions to enable fan curve mode.".to_string());
     }
 
