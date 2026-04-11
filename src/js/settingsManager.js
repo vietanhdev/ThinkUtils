@@ -58,9 +58,21 @@ export function getCurrentSettings() {
 }
 
 /**
- * Apply fan control settings
+ * Apply fan control settings (only if permissions are available)
  */
 export async function applyFanSettings(settings) {
+  // Check if we have permissions before trying to set fan speed,
+  // otherwise this would trigger a pkexec password prompt on startup.
+  try {
+    const perms = await invoke('check_permissions');
+    if (!perms.success || !perms.data) {
+      console.log('[Settings] Skipping fan settings - no permissions yet');
+      return;
+    }
+  } catch {
+    return;
+  }
+
   const { setFanMode } = await import('./views/fan.js');
 
   if (settings.fan_curve_enabled) {
@@ -134,8 +146,10 @@ export async function applyAllSettings(settings) {
 
   console.log('[Settings] Applying all settings...');
 
-  // Apply settings in order
-  await applyPerformanceSettings(settings);
+  // Only apply UI-level and fan settings on startup.
+  // Performance settings (CPU governor, turbo boost, power profile) are NOT
+  // auto-applied because they use pkexec which would prompt for a password
+  // every time the app starts. Users apply these explicitly from the UI.
   await applyBatterySettings(settings);
   await applyFanSettings(settings);
 
