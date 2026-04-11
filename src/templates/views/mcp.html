@@ -112,7 +112,6 @@ claude mcp add --transport sse thinkutils http://127.0.0.1:8765/sse</pre
 {
   "mcpServers": {
     "thinkutils": {
-      "type": "sse",
       "url": "http://127.0.0.1:8765/sse"
     }
   }
@@ -123,45 +122,43 @@ claude mcp add --transport sse thinkutils http://127.0.0.1:8765/sse</pre
 
     <div class="mcp-tab-content" id="tab-chatgpt">
       <p>
-        ChatGPT Desktop supports MCP servers. Go to
-        <strong>Settings &gt; Features &gt; MCP Servers</strong>, click <strong>Add</strong>, and
-        enter:
+        In ChatGPT Desktop, click your profile &gt; <strong>Settings</strong> &gt;
+        <strong>Connectors</strong> &gt; <strong>Advanced settings</strong>, enable
+        <strong>Developer mode</strong>, then go back to Connectors and click
+        <strong>Create</strong>:
       </p>
       <pre class="mcp-config">
-Server URL: http://127.0.0.1:8765/sse
-Name: ThinkUtils</pre
+Name: ThinkUtils
+Server URL: http://127.0.0.1:8765/sse</pre
       >
       <p class="mcp-note">Requires ChatGPT Desktop with MCP support (Plus/Team/Enterprise).</p>
     </div>
 
     <div class="mcp-tab-content" id="tab-cursor">
       <p>
-        In Cursor or Windsurf, go to <strong>Settings &gt; MCP</strong> and add a new SSE server:
+        Add to <code>.cursor/mcp.json</code> (project) or <code>~/.cursor/mcp.json</code> (global):
       </p>
-      <pre class="mcp-config">
-Name: thinkutils
-URL: http://127.0.0.1:8765/sse
-Transport: SSE</pre
+      <pre class="mcp-config" id="config-cursor">
+{
+  "mcpServers": {
+    "thinkutils": {
+      "url": "http://127.0.0.1:8765/sse"
+    }
+  }
+}</pre
       >
+      <button class="btn-secondary btn-copy" data-target="tab-cursor">Copy</button>
+      <p class="mcp-note">
+        For <strong>Windsurf</strong>, add to <code>~/.codeium/windsurf/mcp_config.json</code> with
+        the same format.
+      </p>
     </div>
 
     <div class="mcp-tab-content" id="tab-lm-studio">
-      <p>
-        In LM Studio, open <strong>Settings</strong> (gear icon), go to the
-        <strong>MCP</strong> section, and add a new server:
-      </p>
-      <pre class="mcp-config">
-Name: thinkutils
-Transport: SSE
-URL: http://127.0.0.1:8765/sse</pre
-      >
-      <p class="mcp-note">
-        Alternatively, add it to
-        <code>~/.lmstudio/config/mcp-servers.json</code>:
-      </p>
+      <p>Add to <code>~/.lmstudio/mcp.json</code>:</p>
       <pre class="mcp-config" id="config-lm-studio">
 {
-  "servers": {
+  "mcpServers": {
     "thinkutils": {
       "url": "http://127.0.0.1:8765/sse"
     }
@@ -169,7 +166,10 @@ URL: http://127.0.0.1:8765/sse</pre
 }</pre
       >
       <button class="btn-secondary btn-copy" data-target="tab-lm-studio">Copy</button>
-      <p class="mcp-note">Requires LM Studio 0.3.6 or later with MCP support enabled.</p>
+      <p class="mcp-note">
+        Or in the app: switch to the <strong>Program</strong> tab &gt; click
+        <strong>Install</strong> &gt; <strong>Edit mcp.json</strong>. Requires LM Studio 0.3.6+.
+      </p>
     </div>
 
     <div class="mcp-tab-content" id="tab-other">

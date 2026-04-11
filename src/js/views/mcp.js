@@ -90,21 +90,33 @@ export async function loadMcpStatus() {
 function updateConfigSnippets(host, port) {
   const url = `http://${host}:${port}/sse`;
 
-  const sseConfig = {
-    mcpServers: {
-      thinkutils: { type: 'sse', url }
-    }
-  };
-  const configStr = JSON.stringify(sseConfig, null, 2);
+  // Claude Code uses "type": "sse"
+  const claudeCodeStr = JSON.stringify(
+    { mcpServers: { thinkutils: { type: 'sse', url } } },
+    null,
+    2
+  );
+  // All others use just "url"
+  const standardStr = JSON.stringify({ mcpServers: { thinkutils: { url } } }, null, 2);
 
   const claudeCodeConfig = document.getElementById('config-claude-code');
   if (claudeCodeConfig) {
-    claudeCodeConfig.textContent = configStr;
+    claudeCodeConfig.textContent = claudeCodeStr;
   }
 
   const claudeDesktopConfig = document.getElementById('config-claude-desktop');
   if (claudeDesktopConfig) {
-    claudeDesktopConfig.textContent = configStr;
+    claudeDesktopConfig.textContent = standardStr;
+  }
+
+  const cursorConfig = document.getElementById('config-cursor');
+  if (cursorConfig) {
+    cursorConfig.textContent = standardStr;
+  }
+
+  const lmStudioConfig = document.getElementById('config-lm-studio');
+  if (lmStudioConfig) {
+    lmStudioConfig.textContent = standardStr;
   }
 
   const urlDisplay = document.getElementById('mcp-url-display');
