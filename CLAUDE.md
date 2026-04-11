@@ -22,6 +22,16 @@ npm run validate               # Lint + format check (run before committing)
 
 Pre-commit hooks (Husky + lint-staged) run linters automatically on staged files.
 
+## Version Bumping
+
+Version must be updated in all 4 files before release:
+- `package.json` — `"version": "X.Y.Z"`
+- `package-lock.json` — `"version": "X.Y.Z"` (2 occurrences at top)
+- `src-tauri/Cargo.toml` — `version = "X.Y.Z"`
+- `src-tauri/tauri.conf.json` — `"version": "X.Y.Z"`
+
+After committing, tag with `git tag vX.Y.Z` and push the tag — the GitHub Actions workflow builds and publishes release artifacts automatically.
+
 ## Architecture
 
 **Tauri v2 app** with Rust backend and vanilla JavaScript frontend (no framework).
