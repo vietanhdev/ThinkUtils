@@ -35,6 +35,28 @@ A powerful, native desktop application that unlocks the full potential of your T
 ### Settings Sync
 ![Settings Sync](./screenshots/settings_sync.png)
 
+## Installation
+
+### Ubuntu/Debian (APT)
+
+```bash
+echo "deb [trusted=yes] https://gh.vietanh.dev/ThinkUtils/apt ./" | sudo tee /etc/apt/sources.list.d/thinkutils.list
+sudo apt update
+sudo apt install thinkutils
+```
+
+### Manual Download
+
+Download the latest `.deb`, `.rpm`, or `.AppImage` from [GitHub Releases](https://github.com/vietanhdev/ThinkUtils/releases).
+
+```bash
+# Debian/Ubuntu
+sudo dpkg -i thinkutils_*.deb
+
+# Fedora/RHEL
+sudo rpm -i thinkutils-*.rpm
+```
+
 ## Features
 
 ### 🏠 Home Dashboard
