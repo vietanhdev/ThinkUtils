@@ -37,10 +37,25 @@
 .VPHero .VPImage {
   border-radius: 12px;
   box-shadow: 0 8px 32px rgb(0 0 0 / 15%);
+  max-width: 580px;
+  max-height: 580px;
 }
 
 .dark .VPHero .VPImage {
   box-shadow: 0 8px 32px rgb(0 0 0 / 40%);
+}
+
+/* Make hero image container larger */
+.VPHero .image-container {
+  max-width: 580px;
+  max-height: 580px;
+}
+
+@media (width >= 960px) {
+  .VPHero .image-container .image-bg {
+    width: 580px;
+    height: 580px;
+  }
 }
 
 /* Feature cards */
