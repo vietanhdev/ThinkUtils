@@ -4,14 +4,21 @@ ThinkUtils needs write access to system files for CPU, fan, and battery control.
 
 ## Quick Setup
 
-1. Install the polkit policy:
-   ```bash
-   sudo ./install-polkit.sh
-   ```
+1. Launch the app and click **"Setup Permissions"** when prompted
 
-2. Launch the app and click **"Setup Permissions"** when prompted
+2. Enter your password once — done!
 
-3. Enter your password once — done!
+That single step installs the fan helper and a polkit rule scoped to it. There is no separate policy file to install.
+
+### Upgrading from an older version
+
+Versions before this one installed `/usr/share/polkit-1/actions/com.thinkutils.policy` via an `install-polkit.sh` script. That file redefined the **shared** `org.freedesktop.policykit.exec` action, which was broader than ThinkUtils needed. It has been removed, and fan control does not depend on it.
+
+To clear it from an existing install:
+
+```bash
+sudo ./scripts/uninstall-legacy-polkit.sh
+```
 
 ### Optional: Completely Passwordless
 
