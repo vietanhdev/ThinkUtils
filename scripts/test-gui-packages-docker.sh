@@ -458,6 +458,11 @@ for spec in "${TARGETS[@]}"; do
               ${RETRY}
               retry apt-get update -qq >/dev/null
               retry apt-get install -y -qq xvfb imagemagick x11-apps xdotool xcompmgr procps tesseract-ocr >/dev/null 2>&1
+              # An AppImage bundles WebKit and GTK but NOT the graphics stack --
+              # it expects the host to provide Mesa. A bare container has none,
+              # so without these it dies on libgbm.so.1 and the run tests an
+              # environment no user actually has. A real desktop always has them.
+              retry apt-get install -y -qq libgbm1 libgl1 libegl1 libglx-mesa0 mesa-vulkan-drivers >/dev/null 2>&1
               cd /tmp && cp /a/${pkg} app.AppImage && chmod +x app.AppImage
               ./app.AppImage --appimage-extract >/dev/null 2>&1 || { echo 'FAIL: AppImage extract failed'; exit 1; }
               ${GUI_ENV}
