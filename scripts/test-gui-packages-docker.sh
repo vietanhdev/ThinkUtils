@@ -74,7 +74,15 @@ shopt -s nullglob
 # directory that accumulates old builds. Resolving by glob alone would silently
 # test whatever sorted first -- and `ls | head -1` sorts "0.1.10" before "0.1.5",
 # so "newest" and "first" are not the same thing.
-VERSION="$(jq -r .version "${REPO_ROOT}/package.json")"
+VERSION="$(jq -r .version "${REPO_ROOT}/package.json" 2>/dev/null || true)"
+if [ -z "${VERSION}" ] || [ "${VERSION}" = "null" ]; then
+    # Without this the version interpolates as empty and every glob becomes
+    # something like thinkutils__amd64.deb, which matches nothing -- so the run
+    # reports "no artifact" and the real cause (jq missing) stays hidden.
+    echo "ERROR: could not read .version from package.json" >&2
+    command -v jq >/dev/null || echo "       jq is not installed" >&2
+    exit 1
+fi
 
 # Resolve the artifact for the CURRENT version. Never a hardcoded version (it
 # would stop matching and silently test nothing) and never just "the only one"
