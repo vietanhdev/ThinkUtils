@@ -1,6 +1,5 @@
 use chrono::Utc;
 use oauth2::basic::BasicClient;
-use oauth2::reqwest::async_http_client;
 use oauth2::{
     AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge, RedirectUrl,
     Scope, TokenResponse, TokenUrl,
@@ -161,7 +160,29 @@ fn write_private(path: &std::path::Path, content: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn create_oauth_client() -> Result<BasicClient, String> {
+/// The HTTP client oauth2 5.x uses for token exchange.
+///
+/// Redirects are disabled deliberately, per the oauth2 crate's own guidance:
+/// following them on a token endpoint opens the client to SSRF. In 4.x this was
+/// hidden inside the crate's `async_http_client`; 5.x hands the caller the
+/// choice, so the choice has to be made explicitly.
+fn oauth_http_client() -> Result<reqwest::Client, String> {
+    reqwest::ClientBuilder::new()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))
+}
+
+fn create_oauth_client() -> Result<
+    oauth2::basic::BasicClient<
+        oauth2::EndpointSet,
+        oauth2::EndpointNotSet,
+        oauth2::EndpointNotSet,
+        oauth2::EndpointNotSet,
+        oauth2::EndpointSet,
+    >,
+    String,
+> {
     let client_id = ClientId::new(
         GOOGLE_CLIENT_ID
             .filter(|s| !s.is_empty())
@@ -181,13 +202,17 @@ fn create_oauth_client() -> Result<BasicClient, String> {
     let token_url = TokenUrl::new("https://oauth2.googleapis.com/token".to_string())
         .map_err(|e| format!("Invalid token URL: {}", e))?;
 
-    Ok(
-        BasicClient::new(client_id, Some(client_secret), auth_url, Some(token_url))
-            .set_redirect_uri(
-                RedirectUrl::new(REDIRECT_URI.to_string())
-                    .map_err(|e| format!("Invalid redirect URL: {}", e))?,
-            ),
-    )
+    // 5.x replaces the four-argument constructor with a builder, and encodes
+    // which endpoints are configured in the type -- hence the EndpointSet
+    // parameters on the return type above.
+    Ok(BasicClient::new(client_id)
+        .set_client_secret(client_secret)
+        .set_auth_uri(auth_url)
+        .set_token_uri(token_url)
+        .set_redirect_uri(
+            RedirectUrl::new(REDIRECT_URI.to_string())
+                .map_err(|e| format!("Invalid redirect URL: {}", e))?,
+        ))
 }
 
 // Initiate Google OAuth flow
@@ -291,10 +316,11 @@ async fn exchange_code_for_token(code: String, state: String) -> Result<(), Stri
 
     let client = create_oauth_client()?;
 
+    let http_client = oauth_http_client()?;
     let token_result = client
         .exchange_code(AuthorizationCode::new(code))
         .set_pkce_verifier(oauth2::PkceCodeVerifier::new(pkce_verifier))
-        .request_async(async_http_client)
+        .request_async(&http_client)
         .await
         .map_err(|e| format!("Token exchange failed: {}", e))?;
 
