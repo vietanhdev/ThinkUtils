@@ -301,6 +301,14 @@ jobs:
         working-directory: src-tauri
         run: cargo test --test hardware_profiles
 
+      # Machine shapes nobody here owns, built from scratch: single-fan, dual-fan,
+      # four-fan, non-ThinkPad, no hardware at all, and malformed sysfs contents.
+      # The captured profile covers one real machine; these cover the ones most
+      # likely to break precisely because nobody develops on them.
+      - name: Run synthetic hardware tests
+        working-directory: src-tauri
+        run: cargo test --test synthetic_hardware
+
   # A full VitePress production build, not a link check. VitePress compiles every
   # page as a Vue SFC, so a literal {{ }} in prose parses as an interpolation and
   # fails the build - and only the production build catches it.

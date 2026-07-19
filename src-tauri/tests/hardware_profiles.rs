@@ -23,27 +23,6 @@ fn read_profile_file(profile: &str, path: &str) -> Option<String> {
     std::fs::read_to_string(profile_root(profile).join(path.trim_start_matches('/'))).ok()
 }
 
-/// Count tachometers by walking the captured hwmon tree, the way generic
-/// hardware discovery has to.
-fn count_matching(profile: &str, predicate: impl Fn(&str) -> bool) -> usize {
-    fn walk(dir: &std::path::Path, out: &mut Vec<String>) {
-        let Ok(entries) = std::fs::read_dir(dir) else {
-            return;
-        };
-        for e in entries.flatten() {
-            let p = e.path();
-            if p.is_dir() {
-                walk(&p, out);
-            } else if let Some(n) = p.file_name().and_then(|n| n.to_str()) {
-                out.push(n.to_string());
-            }
-        }
-    }
-    let mut names = Vec::new();
-    walk(&profile_root(profile), &mut names);
-    names.iter().filter(|n| predicate(n)).count()
-}
-
 const P1: &str = "thinkpad-p1-gen-4i";
 
 #[test]
