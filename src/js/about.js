@@ -1,4 +1,5 @@
 // About Dialog
+import { openDialog, closeDialog } from './dialog.js';
 export function setupAboutDialog() {
   const aboutLink = document.getElementById('about-link');
   const closeAboutBtn = document.getElementById('close-about');
@@ -22,36 +23,12 @@ export function setupAboutDialog() {
 
 function showAbout() {
   console.log('[About] Opening dialog');
-  const dialog = document.getElementById('about-dialog');
-  if (dialog) {
-    dialog.style.display = 'flex';
-
-    if (!dialog.hasAttribute('data-listener')) {
-      dialog.setAttribute('data-listener', 'true');
-      dialog.addEventListener('click', (e) => {
-        if (e.target === dialog) {
-          closeAbout();
-        }
-      });
-    }
-
-    const escapeHandler = (e) => {
-      if (e.key === 'Escape') {
-        closeAbout();
-        document.removeEventListener('keydown', escapeHandler);
-      }
-    };
-    document.addEventListener('keydown', escapeHandler);
-
-    setupAboutLinks();
-  }
+  openDialog('about-dialog');
+  setupAboutLinks();
 }
 
 function closeAbout() {
-  const dialog = document.getElementById('about-dialog');
-  if (dialog) {
-    dialog.style.display = 'none';
-  }
+  closeDialog('about-dialog');
 }
 
 function setupAboutLinks() {

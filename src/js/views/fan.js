@@ -312,7 +312,18 @@ async function tryUpdatePermissions() {
 }
 
 export function startAutoUpdate() {
+  // Guard against double-start: switching to the fan view twice without a hide
+  // in between would otherwise leak a second interval polling the same files.
+  stopAutoUpdate();
   updateSensorData();
   const interval = setInterval(updateSensorData, 1000);
   setState('updateInterval', interval);
+}
+
+export function stopAutoUpdate() {
+  const interval = getState('updateInterval');
+  if (interval) {
+    clearInterval(interval);
+    setState('updateInterval', null);
+  }
 }

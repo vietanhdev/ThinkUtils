@@ -21,6 +21,12 @@ export function showStatus(message, type = 'info') {
     document.body.appendChild(statusEl);
   }
 
+  // Without a live region this banner is invisible to screen readers, so every
+  // success and failure message went unannounced. Errors are assertive because
+  // the action failed and the user needs to know now; the rest are polite.
+  statusEl.setAttribute('role', 'status');
+  statusEl.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+
   statusEl.textContent = message;
 
   const colors = {

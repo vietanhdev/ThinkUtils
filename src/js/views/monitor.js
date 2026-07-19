@@ -4,13 +4,12 @@ const { invoke } = window.__TAURI__.core;
 import { setState, getState } from '../state.js';
 
 export async function startMonitoring() {
+  stopMonitoring();
   await updateMonitorData();
 
-  const interval = getState('monitorInterval');
-  if (interval) {
-    clearInterval(interval);
-  }
-
+  // The currentView check inside the tick is no longer load-bearing now that
+  // navigation stops this on hide, but it costs nothing and keeps the interval
+  // harmless if it ever outlives its view again.
   const newInterval = setInterval(async () => {
     if (getState('currentView') === 'monitor') {
       await updateMonitorData();
@@ -169,4 +168,12 @@ function displayProcessMonitor(processes) {
     `;
     container.appendChild(procDiv);
   });
+}
+
+export function stopMonitoring() {
+  const interval = getState('monitorInterval');
+  if (interval) {
+    clearInterval(interval);
+    setState('monitorInterval', null);
+  }
 }
