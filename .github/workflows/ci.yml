@@ -1,0 +1,215 @@
+name: CI
+
+# The gate that was missing entirely: until this existed nothing ran on a pull
+# request, so the Rust tests had never once blocked a merge or a release.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Callable from release.yml so cutting a tag runs this exact pipeline rather
+  # than a copy of it that can drift. One definition of "green", used by both.
+  workflow_call:
+
+# A force-push or a quick second commit should cancel the superseded run rather
+# than queue behind it. Never cancel on main: those runs record what shipped.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Seconds long, no toolchain, and deliberately first. CLAUDE.md documents four
+  # files whose versions must never disagree, enforced until now by nothing but
+  # care. Disagreement ships a package whose filename and About dialog contradict
+  # each other, or produces a tag release.yml rejects after a full build.
+  version-consistency:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the four version declarations agree
+        run: |
+          set -euo pipefail
+          pkg=$(jq -r .version package.json)
+          lock=$(jq -r .version package-lock.json)
+          lockpkg=$(jq -r '.packages."".version' package-lock.json)
+          cargo=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -1)
+          tauri=$(jq -r .version src-tauri/tauri.conf.json)
+
+          printf 'package.json             : %s\n' "$pkg"
+          printf 'package-lock.json (top)  : %s\n' "$lock"
+          printf 'package-lock.json (pkgs) : %s\n' "$lockpkg"
+          printf 'src-tauri/Cargo.toml     : %s\n' "$cargo"
+          printf 'src-tauri/tauri.conf.json: %s\n' "$tauri"
+
+          fail=0
+          for v in "$lock" "$lockpkg" "$cargo" "$tauri"; do
+            [ "$v" = "$pkg" ] || fail=1
+          done
+          if [ "$fail" = "1" ]; then
+            echo "::error::version declarations disagree - see CLAUDE.md 'Version Bumping'"
+            exit 1
+          fi
+          echo "OK: all version declarations agree at $pkg"
+
+  # Runs exactly what husky's pre-commit hook runs. That hook only sees STAGED
+  # files, on machines that ran npm install - a convenience, not a gate.
+  frontend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      # npm ci, not npm install: install can resolve a tree the lockfile does not
+      # pin, so CI would be testing dependencies no developer has.
+      - run: npm ci
+      - run: npm run validate
+
+  # fmt, clippy and test share one job because they share one compilation and one
+  # cache; splitting them pays the webkit2gtk build three times for no extra signal.
+  rust:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        # Not a workspace: the manifest lives under src-tauri/.
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          # The manifest is not at the repo root, so the action must be told where
+          # the crate lives or it caches nothing and recompiles Tauri every run.
+          workspaces: src-tauri
+
+      # Required even for clippy and test: the tauri crate links the GTK3 WebKit
+      # stack at build time, so nothing compiles without these.
+      - name: Install Tauri Linux dependencies
+        working-directory: .
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf
+
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+
+  # Its own job so a RustSec advisory reads as a distinct red check rather than
+  # being buried in `rust`. This dependency surface earns it: reqwest and oauth2
+  # (Drive sync) and the MCP server transport are all network-facing.
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install cargo-audit --locked
+      - run: cargo audit
+        working-directory: src-tauri
+
+  # ThinkUtils tells users which packages to install and which commands to run.
+  # Getting the distro wrong hands someone a command that cannot work.
+  #
+  # tests/fixtures/os-release/ holds real files captured from these images. This
+  # job re-fetches them from the live images and fails if any has drifted, so a
+  # distro changing its ID or ID_LIKE surfaces here rather than in a bug report.
+  # Capturing them beat writing them from memory: the real files corrected three
+  # wrong assumptions (Arch has no ID_LIKE, Mint 21 is ID_LIKE=ubuntu alone, and
+  # quoting is inconsistent across distros).
+  distro-detection:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Re-fetch os-release from live distro images
+        run: |
+          set -euo pipefail
+          declare -A images=(
+            [ubuntu-24.04]=ubuntu:24.04
+            [ubuntu-22.04]=ubuntu:22.04
+            [debian-12]=debian:12
+            [fedora-41]=fedora:41
+            [arch]=archlinux:latest
+            [opensuse-tumbleweed]=opensuse/tumbleweed
+            [rocky-9]=rockylinux:9
+            [linuxmint-21]=linuxmintd/mint21-amd64
+          )
+
+          drifted=0
+          for name in "${!images[@]}"; do
+            image="${images[$name]}"
+            fixture="src-tauri/tests/fixtures/os-release/$name"
+
+            if ! docker pull -q "$image" >/dev/null 2>&1; then
+              echo "::warning::could not pull $image - skipping $name"
+              continue
+            fi
+
+            live=$(docker run --rm --entrypoint cat "$image" /etc/os-release 2>/dev/null || true)
+            if [ -z "$live" ]; then
+              echo "::warning::could not read /etc/os-release from $image"
+              continue
+            fi
+
+            # Compare only the keys detection depends on. PRETTY_NAME and build
+            # dates change on every image rebuild and would make this permanently red.
+            live_keys=$(printf '%s\n' "$live" | grep -E '^(ID|ID_LIKE)=' | sort || true)
+            fixture_keys=$(grep -E '^(ID|ID_LIKE)=' "$fixture" | sort || true)
+
+            if [ "$live_keys" != "$fixture_keys" ]; then
+              echo "::error::$name drifted from $image"
+              echo "  fixture: $fixture_keys"
+              echo "  live   : $live_keys"
+              drifted=1
+            else
+              echo "OK $name"
+            fi
+          done
+
+          if [ "$drifted" = "1" ]; then
+            echo "::error::a distro changed its ID/ID_LIKE - update the fixtures and check detect_package_manager still maps it"
+            exit 1
+          fi
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf
+      - name: Run distro detection tests
+        working-directory: src-tauri
+        run: cargo test --test distro_detection
+
+  # A full VitePress production build, not a link check. VitePress compiles every
+  # page as a Vue SFC, so a literal {{ }} in prose parses as an interpolation and
+  # fails the build - and only the production build catches it.
+  docs:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run docs:build
