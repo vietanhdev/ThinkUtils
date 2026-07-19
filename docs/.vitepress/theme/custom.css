@@ -96,3 +96,68 @@
   max-width: 100%;
   height: auto;
 }
+
+/* --- Download page --------------------------------------------------------
+   Cards for the package downloads. Kept in the theme rather than inline in
+   download.md so the markdown stays readable and the styling can be reused. */
+
+.dl-version {
+  margin: 0 0 1.5rem;
+  color: var(--vp-c-text-2);
+  font-size: 0.95rem;
+}
+
+.dl-grid {
+  display: grid;
+
+  /* auto-fit rather than a fixed column count, so three cards sit in a row on a
+     desktop and stack cleanly on a phone without a media query. */
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.85rem;
+  margin: 1.5rem 0;
+}
+
+.dl-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+  background: var(--vp-c-bg-soft);
+  text-decoration: none;
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.dl-card:hover {
+  border-color: var(--vp-c-brand-1);
+  transform: translateY(-2px);
+}
+
+/* Keyboard users get the same affordance as the hover state. */
+.dl-card:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
+
+.dl-card-title {
+  font-weight: 600;
+  color: var(--vp-c-text-1);
+}
+
+.dl-card-sub {
+  font-size: 0.85rem;
+  color: var(--vp-c-text-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dl-card {
+    transition: none;
+  }
+
+  .dl-card:hover {
+    transform: none;
+  }
+}

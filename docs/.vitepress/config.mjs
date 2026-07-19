@@ -12,10 +12,7 @@ export default withMermaid(
       nav: [
         { text: 'Guide', link: '/guide/getting-started' },
         { text: 'Development', link: '/development/architecture' },
-        {
-          text: 'Download',
-          link: 'https://github.com/vietanhdev/ThinkUtils/releases',
-        },
+        { text: 'Download', link: '/download' },
       ],
       sidebar: {
         '/guide/': [
