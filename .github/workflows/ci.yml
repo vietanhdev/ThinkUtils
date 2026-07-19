@@ -263,14 +263,39 @@ jobs:
       - name: No captured profile may carry identifying values
         run: |
           set -euo pipefail
+          # `|| true` is load-bearing: grep exits 1 when it finds nothing, and
+          # under pipefail that propagates and kills the step. Without it this
+          # check fails in exactly the case it is meant to pass -- clean fixtures.
           leaks=$(grep -rIn -iE 'serial|uuid|asset|([0-9a-f]{2}:){5}[0-9a-f]{2}' \
-            src-tauri/tests/fixtures/hardware/ 2>/dev/null | grep -iv 'redacted' | wc -l)
-          if [ "$leaks" -ne 0 ]; then
+            src-tauri/tests/fixtures/hardware/ 2>/dev/null \
+            | grep -iv 'redacted' | wc -l) || true
+
+          if [ "${leaks:-0}" -ne 0 ]; then
             echo "::error::a hardware profile contains unredacted identifying values"
-            grep -rIn -iE 'serial|uuid|asset' src-tauri/tests/fixtures/hardware/ | grep -iv redacted | head
+            grep -rIn -iE 'serial|uuid|asset' src-tauri/tests/fixtures/hardware/ \
+              | grep -iv redacted | head || true
             exit 1
           fi
           echo "OK: no identifying values in any captured profile"
+
+      # Proves the check above can actually fail. A guard that only ever passes is
+      # indistinguishable from no guard, and this one already had that bug once.
+      - name: Verify the redaction check detects a planted leak
+        run: |
+          set -euo pipefail
+          planted=src-tauri/tests/fixtures/hardware/.leak-canary
+          printf 'POWER_SUPPLY_SERIAL_NUMBER=ABC123XYZ\n' > "$planted"
+
+          leaks=$(grep -rIn -iE 'serial|uuid|asset' \
+            src-tauri/tests/fixtures/hardware/ 2>/dev/null \
+            | grep -iv 'redacted' | wc -l) || true
+          rm -f "$planted"
+
+          if [ "${leaks:-0}" -eq 0 ]; then
+            echo "::error::the redaction check did not detect a planted serial number"
+            exit 1
+          fi
+          echo "OK: redaction check caught the planted leak (${leaks} match(es))"
 
       - name: Run hardware profile tests
         working-directory: src-tauri
