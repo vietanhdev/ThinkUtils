@@ -27,13 +27,14 @@ window.addEventListener('unhandledrejection', (e) => {
 import { initializeElements } from './dom.js';
 import { setupTitlebar } from './titlebar.js';
 import { setupFeatureNavigation } from './navigation.js';
-import { setupFanControl, checkInitialPermissions, startAutoUpdate } from './views/fan.js';
+import { setupFanControl, checkInitialPermissions } from './views/fan.js';
 import { setupHomeActions, updateHomeView } from './views/home.js';
 import { setupSyncHandlers } from './views/sync.js';
 import { setupBatteryHandlers } from './views/battery.js';
 import { setupSecurityHandlers } from './views/security.js';
 import { setupAboutDialog } from './about.js';
-import { state } from './state.js';
+import { openDialog, closeDialog } from './dialog.js';
+import { state, setState } from './state.js';
 import { initializeSettings } from './settingsManager.js';
 import { isModularMode, loadTemplates, injectTemplates } from './templateLoader.js';
 
@@ -65,17 +66,13 @@ async function checkAndSetupPermissions() {
 }
 
 function showPermissionDialog() {
-  const dialog = document.getElementById('permission-dialog');
-  if (dialog) {
-    dialog.style.display = 'flex';
-  }
+  // Was a bare style.display toggle with no Escape handler, which made this
+  // dialog impossible to dismiss from the keyboard.
+  openDialog('permission-dialog');
 }
 
 function hidePermissionDialog() {
-  const dialog = document.getElementById('permission-dialog');
-  if (dialog) {
-    dialog.style.display = 'none';
-  }
+  closeDialog('permission-dialog');
 }
 
 async function setupPermissions() {
@@ -149,7 +146,11 @@ async function initializeApp() {
   setupSecurityHandlers();
   setupAboutDialog();
   setupPermissionDialog();
-  startAutoUpdate();
+
+  // The fan sensor poll is NOT started here any more. It runs every second, and
+  // starting it at launch meant it polled /proc for the life of the app no
+  // matter which view was open. navigation.js starts it when the fan view is
+  // shown and stops it when the view is left.
 
   // Check all permissions at startup (sysfs + fan helper + polkit rule).
   // One dialog handles everything. After setup, re-check fan permissions.
@@ -160,12 +161,14 @@ async function initializeApp() {
   console.log('[ThinkUtils] Loading settings...');
   await initializeSettings();
 
-  // Update home view periodically
-  setInterval(() => {
+  // Home refresh. Tracked in state so beforeunload can clear it -- this used to
+  // be an untracked setInterval that the cleanup handler claimed to cover.
+  const homeInterval = setInterval(() => {
     if (state.currentView === 'home') {
       updateHomeView();
     }
   }, 2000);
+  setState('homeInterval', homeInterval);
 
   console.log('[ThinkUtils] Ready');
 
@@ -184,11 +187,13 @@ async function initializeApp() {
 
 window.addEventListener('DOMContentLoaded', initializeApp);
 
+// Clear every tracked timer. The previous version listed two of the three and
+// read as though it were complete.
 window.addEventListener('beforeunload', () => {
-  if (state.updateInterval) {
-    clearInterval(state.updateInterval);
-  }
-  if (state.monitorInterval) {
-    clearInterval(state.monitorInterval);
+  for (const key of ['updateInterval', 'monitorInterval', 'homeInterval']) {
+    if (state[key]) {
+      clearInterval(state[key]);
+      setState(key, null);
+    }
   }
 });
