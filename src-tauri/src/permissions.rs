@@ -20,28 +20,56 @@ pub struct PermissionStatus {
     pub missing_files: Vec<String>,
 }
 
-// Files that need write permissions
+// Files that need write permissions and are the same on every machine.
+//
+// The battery thresholds are NOT here: their attribute names vary, and this list
+// previously named the legacy thinkpad_acpi pair while battery.rs wrote the
+// standard kernel pair. Both exist on a ThinkPad and report the same value, but
+// they are separate sysfs files, so granting one never affected the other --
+// "Grant Permissions" silently never fixed battery thresholds. They come from
+// battery::threshold_paths() now, which is the single source of truth.
+//
+// thinkpad_hwmon/pwm1 is also gone: that path does not exist. The real attribute
+// lives under .../thinkpad_hwmon/hwmon/hwmonN/pwm1, and the exists() guard below
+// meant the wrong path was silently skipped rather than reported.
 const REQUIRED_FILES: &[&str] = &[
     "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor",
     "/sys/devices/system/cpu/intel_pstate/no_turbo",
-    "/sys/devices/platform/thinkpad_hwmon/pwm1",
-    "/sys/class/power_supply/BAT0/charge_start_threshold",
-    "/sys/class/power_supply/BAT0/charge_stop_threshold",
 ];
+
+/// Every sysfs file the app wants writable, resolved for this machine.
+fn required_files() -> Vec<String> {
+    let mut files: Vec<String> = REQUIRED_FILES.iter().map(|s| s.to_string()).collect();
+    if let Some((start, stop)) = crate::battery::threshold_paths() {
+        files.push(start);
+        files.push(stop);
+    }
+    // The thinkpad hwmon PWM lives under a numbered hwmon directory, so it has to
+    // be discovered rather than hardcoded.
+    if let Ok(entries) = fs::read_dir("/sys/devices/platform/thinkpad_hwmon/hwmon") {
+        for entry in entries.flatten() {
+            let pwm = entry.path().join("pwm1");
+            if pwm.exists() {
+                files.push(pwm.to_string_lossy().to_string());
+            }
+        }
+    }
+    files
+}
 
 #[tauri::command]
 pub async fn check_permissions_status() -> ApiResponse<PermissionStatus> {
     let mut missing_files = Vec::new();
 
-    for file_path in REQUIRED_FILES {
-        if Path::new(file_path).exists() {
+    for file_path in required_files() {
+        if Path::new(&file_path).exists() {
             // Check if we can write to it
-            match fs::OpenOptions::new().write(true).open(file_path) {
+            match fs::OpenOptions::new().write(true).open(&file_path) {
                 Ok(_) => {
                     // We have permission
                 }
                 Err(_) => {
-                    missing_files.push(file_path.to_string());
+                    missing_files.push(file_path.clone());
                 }
             }
         }
@@ -98,8 +126,8 @@ pub async fn setup_permissions() -> ApiResponse<String> {
     ];
 
     // Add chmod commands for each file that exists
-    for file_path in REQUIRED_FILES {
-        if Path::new(file_path).exists() {
+    for file_path in required_files() {
+        if Path::new(&file_path).exists() {
             script_lines.push(format!("if [ -f {} ]; then", file_path));
             script_lines.push(format!("  chmod 666 {} 2>/dev/null || true", file_path));
             script_lines.push(format!(
