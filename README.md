@@ -193,7 +193,7 @@ sudo apt install build-essential \
     file \
     git \
     libayatana-appindicator3-dev \
-    librsvg2-dev
+    librsvg2-dev \
     libssl-dev \
     libwebkit2gtk-4.1-dev \
     npm \
@@ -202,16 +202,16 @@ sudo apt install build-essential \
 
 **Fedora:**
 ```bash
-sudo dnf install curl \
+sudo dnf install cargo \
+    curl \
     file \
-    libappindicator-gtk3-devel \
-    librsvg2-devel
-    openssl-devel \
-    wget \
-    cargo \ 
     git \
+    libappindicator-gtk3-devel \
+    librsvg2-devel \
     npm \
-    webkit2gtk4.1-devel
+    openssl-devel \
+    webkit2gtk4.1-devel \
+    wget
 ```
 
 ### Getting Started
