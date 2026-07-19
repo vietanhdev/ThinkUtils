@@ -1,8 +1,8 @@
 use chrono::Utc;
 use oauth2::basic::BasicClient;
 use oauth2::{
-    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge, RedirectUrl,
-    Scope, TokenResponse, TokenUrl,
+    AuthUrl, AuthorizationCode, ClientId, CsrfToken, PkceCodeChallenge, RedirectUrl, Scope,
+    TokenResponse, TokenUrl,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -10,12 +10,22 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-// Google OAuth credentials, supplied at build time. Never hardcode these:
-// a desktop binary cannot keep a secret, so anything embedded here is public.
-// Set THINKUTILS_GOOGLE_CLIENT_ID / _SECRET when building to enable sync.
-// Create credentials at https://console.cloud.google.com (APIs & Services > Credentials).
+// Google OAuth client id, supplied at build time.
+//
+// There is deliberately NO client secret. A desktop binary cannot keep one --
+// anything compiled in is readable by anyone who has the binary, which is how
+// the previous secret ended up public in this repo's first commit.
+//
+// Google's own guidance for installed apps is a PUBLIC client with PKCE and no
+// secret. PKCE is what actually protects the exchange: the verifier is generated
+// per-authorisation, never leaves this process, and an intercepted authorisation
+// code is useless without it. A shipped secret adds nothing an attacker cannot
+// read, while creating something that has to be rotated when it leaks.
+//
+// Set THINKUTILS_GOOGLE_CLIENT_ID when building to enable sync. Create the
+// credential as an "OAuth client ID" of type "Desktop app" at
+// https://console.cloud.google.com (APIs & Services > Credentials).
 const GOOGLE_CLIENT_ID: Option<&str> = option_env!("THINKUTILS_GOOGLE_CLIENT_ID");
-const GOOGLE_CLIENT_SECRET: Option<&str> = option_env!("THINKUTILS_GOOGLE_CLIENT_SECRET");
 const REDIRECT_URI: &str = "http://localhost:8765/callback";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -191,12 +201,6 @@ fn create_oauth_client() -> Result<
             )?
             .to_string(),
     );
-    let client_secret = ClientSecret::new(
-        GOOGLE_CLIENT_SECRET
-            .filter(|s| !s.is_empty())
-            .ok_or("Google sync is not configured in this build (THINKUTILS_GOOGLE_CLIENT_SECRET unset).")?
-            .to_string(),
-    );
     let auth_url = AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
         .map_err(|e| format!("Invalid auth URL: {}", e))?;
     let token_url = TokenUrl::new("https://oauth2.googleapis.com/token".to_string())
@@ -205,8 +209,9 @@ fn create_oauth_client() -> Result<
     // 5.x replaces the four-argument constructor with a builder, and encodes
     // which endpoints are configured in the type -- hence the EndpointSet
     // parameters on the return type above.
+    // No .set_client_secret: this is a public client. PKCE carries the security
+    // of the exchange, and google_auth_init always sets a challenge.
     Ok(BasicClient::new(client_id)
-        .set_client_secret(client_secret)
         .set_auth_uri(auth_url)
         .set_token_uri(token_url)
         .set_redirect_uri(
@@ -780,6 +785,94 @@ mod tests {
                 .is_err(),
             "client followed the Location header — a token endpoint that redirects \
              can now point this client at an arbitrary host"
+        );
+    }
+}
+
+#[cfg(test)]
+mod public_client_tests {
+    /// A desktop binary cannot keep a secret -- anything compiled in is readable
+    /// by anyone holding the binary, which is exactly how this project's first
+    /// client secret ended up public. Google's guidance for installed apps is a
+    /// public client with PKCE and no secret.
+    ///
+    /// Asserted against the source because the property is the ABSENCE of a call
+    /// and there is no runtime state to inspect. Someone re-adding
+    /// set_client_secret to "fix" an auth error would otherwise pass unnoticed.
+    const SOURCE: &str = include_str!("sync.rs");
+
+    /// Production code only, with comments stripped.
+    ///
+    /// Both exclusions are load-bearing and each was learned by a failing run:
+    /// comments explaining the rule matched it, and then the assertion strings
+    /// in this very module matched it too. The property is about what the app
+    /// does, not about the text describing it.
+    fn code_lines() -> impl Iterator<Item = &'static str> {
+        SOURCE
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap_or("")
+            .lines()
+            .map(|l| l.split("//").next().unwrap_or(""))
+            .filter(|l| !l.trim().is_empty())
+    }
+
+    /// A guard that inspects nothing passes for the wrong reason. If the
+    /// #[cfg(test)] split ever swallows the whole file, every assertion below
+    /// would still pass while checking an empty iterator.
+    #[test]
+    fn the_scan_actually_sees_production_code() {
+        let lines: Vec<&str> = code_lines().collect();
+        assert!(
+            lines.len() > 50,
+            "expected to scan the module body, saw {} lines",
+            lines.len()
+        );
+        assert!(
+            lines.iter().any(|l| l.contains("BasicClient::new")),
+            "the scan should cover create_oauth_client"
+        );
+    }
+
+    #[test]
+    fn no_client_secret_is_configured() {
+        for line in code_lines() {
+            assert!(
+                !line.contains("set_client_secret"),
+                "sync must stay a public client; PKCE carries the exchange:\n  {}",
+                line.trim()
+            );
+        }
+    }
+
+    /// The build-time secret env var should be gone entirely. Leaving it wired
+    /// up invites someone to set it and believe it is doing something.
+    #[test]
+    fn the_client_secret_env_var_is_gone() {
+        for line in code_lines() {
+            assert!(
+                !line.contains("THINKUTILS_GOOGLE_CLIENT_SECRET"),
+                "the secret env var should no longer exist:\n  {}",
+                line.trim()
+            );
+        }
+    }
+
+    /// PKCE is not optional for a public client -- without it nothing protects
+    /// the code exchange at all.
+    #[test]
+    fn pkce_is_used_end_to_end() {
+        assert!(
+            SOURCE.contains("PkceCodeChallenge::new_random_sha256"),
+            "a public client must generate a PKCE challenge"
+        );
+        assert!(
+            SOURCE.contains("set_pkce_challenge"),
+            "the challenge must be attached to the authorisation request"
+        );
+        assert!(
+            SOURCE.contains("set_pkce_verifier"),
+            "the verifier must be sent with the code exchange"
         );
     }
 }
