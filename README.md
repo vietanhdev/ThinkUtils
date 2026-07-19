@@ -187,25 +187,31 @@ sudo modprobe thinkpad_acpi
 
 **Debian/Ubuntu:**
 ```bash
-sudo apt install libwebkit2gtk-4.1-dev \
-    build-essential \
+sudo apt install build-essential \
+    cargo \
     curl \
-    wget \
     file \
-    libssl-dev \
+    git \
     libayatana-appindicator3-dev \
     librsvg2-dev
+    libssl-dev \
+    libwebkit2gtk-4.1-dev \
+    npm \
+    wget
 ```
 
 **Fedora:**
 ```bash
-sudo dnf install webkit2gtk4.1-devel \
-    openssl-devel \
-    curl \
-    wget \
+sudo dnf install curl \
     file \
     libappindicator-gtk3-devel \
     librsvg2-devel
+    openssl-devel \
+    wget \
+    cargo \ 
+    git \
+    npm \
+    webkit2gtk4.1-devel
 ```
 
 ### Getting Started
