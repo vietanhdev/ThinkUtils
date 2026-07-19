@@ -36,9 +36,7 @@ pub fn get_cpu_info() -> ApiResponse<CpuInfo> {
     };
 
     let read_freq = |file: &str| -> u32 {
-        read_file(file)
-            .parse::<u32>()
-            .unwrap_or(0) / 1000 // Convert kHz to MHz
+        read_file(file).parse::<u32>().unwrap_or(0) / 1000 // Convert kHz to MHz
     };
 
     let governor = read_file("scaling_governor");
@@ -80,7 +78,10 @@ fn validate_governor(governor: &str) -> Result<(), String> {
         return Err("Invalid governor name.".to_string());
     }
     if !governor.chars().all(|c| c.is_ascii_lowercase() || c == '_') {
-        return Err("Invalid governor name: only lowercase letters and underscores are allowed.".to_string());
+        return Err(
+            "Invalid governor name: only lowercase letters and underscores are allowed."
+                .to_string(),
+        );
     }
 
     let available = read_available_governors();
@@ -115,10 +116,10 @@ pub async fn set_cpu_governor(governor: String) -> ApiResponse<String> {
             entries
                 .filter_map(|e| e.ok())
                 .filter(|e| {
-                    e.file_name()
-                        .to_string_lossy()
-                        .starts_with("cpu")
-                        && e.file_name().to_string_lossy()[3..].chars().all(|c| c.is_numeric())
+                    e.file_name().to_string_lossy().starts_with("cpu")
+                        && e.file_name().to_string_lossy()[3..]
+                            .chars()
+                            .all(|c| c.is_numeric())
                 })
                 .count()
         })
@@ -218,9 +219,12 @@ pub fn get_power_profile() -> ApiResponse<PowerProfile> {
                 Ok(list_output) if list_output.status.success() => {
                     String::from_utf8_lossy(&list_output.stdout)
                         .lines()
-                        .filter(|line| line.contains("*") || line.trim().starts_with("power-saver")
-                                    || line.trim().starts_with("balanced")
-                                    || line.trim().starts_with("performance"))
+                        .filter(|line| {
+                            line.contains("*")
+                                || line.trim().starts_with("power-saver")
+                                || line.trim().starts_with("balanced")
+                                || line.trim().starts_with("performance")
+                        })
                         .map(|line| {
                             line.trim()
                                 .trim_start_matches("* ")
@@ -233,7 +237,11 @@ pub fn get_power_profile() -> ApiResponse<PowerProfile> {
                         .filter(|s| !s.is_empty())
                         .collect()
                 }
-                _ => vec!["power-saver".to_string(), "balanced".to_string(), "performance".to_string()],
+                _ => vec![
+                    "power-saver".to_string(),
+                    "balanced".to_string(),
+                    "performance".to_string(),
+                ],
             };
 
             return ApiResponse {
@@ -270,7 +278,9 @@ pub fn get_power_profile() -> ApiResponse<PowerProfile> {
     ApiResponse {
         success: false,
         data: None,
-        error: Some("No power management tool found (install power-profiles-daemon or TLP)".to_string()),
+        error: Some(
+            "No power management tool found (install power-profiles-daemon or TLP)".to_string(),
+        ),
     }
 }
 
@@ -308,20 +318,16 @@ pub async fn set_power_profile(profile: String) -> ApiResponse<String> {
         .output()
         .await
     {
-        Ok(output) if output.status.success() => {
-            ApiResponse {
-                success: true,
-                data: Some(format!("TLP mode set to: {}", tlp_mode)),
-                error: None,
-            }
-        }
-        _ => {
-            ApiResponse {
-                success: false,
-                data: None,
-                error: Some("Failed to set power profile".to_string()),
-            }
-        }
+        Ok(output) if output.status.success() => ApiResponse {
+            success: true,
+            data: Some(format!("TLP mode set to: {}", tlp_mode)),
+            error: None,
+        },
+        _ => ApiResponse {
+            success: false,
+            data: None,
+            error: Some("Failed to set power profile".to_string()),
+        },
     }
 }
 
@@ -368,7 +374,10 @@ pub async fn set_turbo_boost(enabled: bool) -> ApiResponse<String> {
     // Try Intel P-state first
     if std::path::Path::new(intel_pstate).exists() {
         let temp_script = format!("/tmp/set_turbo_{}.sh", std::process::id());
-        let script_content = format!("#!/bin/bash\nset -e\necho {} > {}\nexit 0\n", value, intel_pstate);
+        let script_content = format!(
+            "#!/bin/bash\nset -e\necho {} > {}\nexit 0\n",
+            value, intel_pstate
+        );
 
         if fs::write(&temp_script, script_content).is_ok() {
             #[cfg(unix)]
@@ -389,7 +398,10 @@ pub async fn set_turbo_boost(enabled: bool) -> ApiResponse<String> {
                 if output.status.success() {
                     return ApiResponse {
                         success: true,
-                        data: Some(format!("Turbo boost {}", if enabled { "enabled" } else { "disabled" })),
+                        data: Some(format!(
+                            "Turbo boost {}",
+                            if enabled { "enabled" } else { "disabled" }
+                        )),
                         error: None,
                     };
                 }
@@ -400,7 +412,10 @@ pub async fn set_turbo_boost(enabled: bool) -> ApiResponse<String> {
     // Try cpufreq boost
     if std::path::Path::new(cpufreq_boost).exists() {
         let temp_script = format!("/tmp/set_boost_{}.sh", std::process::id());
-        let script_content = format!("#!/bin/bash\nset -e\necho {} > {}\nexit 0\n", boost_value, cpufreq_boost);
+        let script_content = format!(
+            "#!/bin/bash\nset -e\necho {} > {}\nexit 0\n",
+            boost_value, cpufreq_boost
+        );
 
         if fs::write(&temp_script, script_content).is_ok() {
             #[cfg(unix)]
@@ -421,7 +436,10 @@ pub async fn set_turbo_boost(enabled: bool) -> ApiResponse<String> {
                 if output.status.success() {
                     return ApiResponse {
                         success: true,
-                        data: Some(format!("Turbo boost {}", if enabled { "enabled" } else { "disabled" })),
+                        data: Some(format!(
+                            "Turbo boost {}",
+                            if enabled { "enabled" } else { "disabled" }
+                        )),
                         error: None,
                     };
                 }

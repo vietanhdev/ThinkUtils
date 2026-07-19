@@ -50,10 +50,10 @@ pub async fn check_permissions_status() -> ApiResponse<PermissionStatus> {
     if !Path::new(HELPER_PATH).exists() {
         // Can we at least write to the fan file directly?
         let fan_path = "/proc/acpi/ibm/fan";
-        if Path::new(fan_path).exists() {
-            if fs::OpenOptions::new().write(true).open(fan_path).is_err() {
-                missing_files.push("Fan control helper (not installed)".to_string());
-            }
+        if Path::new(fan_path).exists()
+            && fs::OpenOptions::new().write(true).open(fan_path).is_err()
+        {
+            missing_files.push("Fan control helper (not installed)".to_string());
         }
     }
 
@@ -76,7 +76,10 @@ pub async fn setup_permissions() -> ApiResponse<String> {
     let username = std::env::var("USER").unwrap_or_else(|_| "root".to_string());
 
     // Validate username to prevent command injection (only allow alphanumeric, dash, underscore)
-    if !username.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+    if !username
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    {
         return ApiResponse {
             success: false,
             data: None,
@@ -96,7 +99,10 @@ pub async fn setup_permissions() -> ApiResponse<String> {
         if Path::new(file_path).exists() {
             script_lines.push(format!("if [ -f {} ]; then", file_path));
             script_lines.push(format!("  chmod 666 {} 2>/dev/null || true", file_path));
-            script_lines.push(format!("  chown {}:root {} 2>/dev/null || true", username, file_path));
+            script_lines.push(format!(
+                "  chown {}:root {} 2>/dev/null || true",
+                username, file_path
+            ));
             script_lines.push("fi".to_string());
         }
     }
@@ -106,7 +112,10 @@ pub async fn setup_permissions() -> ApiResponse<String> {
     if Path::new(fan_file).exists() {
         script_lines.push(format!("if [ -f {} ]; then", fan_file));
         script_lines.push(format!("  chmod 666 {} 2>/dev/null || true", fan_file));
-        script_lines.push(format!("  chown {}:root {} 2>/dev/null || true", username, fan_file));
+        script_lines.push(format!(
+            "  chown {}:root {} 2>/dev/null || true",
+            username, fan_file
+        ));
         script_lines.push("fi".to_string());
     }
 
@@ -122,7 +131,10 @@ pub async fn setup_permissions() -> ApiResponse<String> {
     script_lines.push(format!("cat > {} << 'RULEEOF'", POLKIT_RULE_PATH));
     script_lines.push(POLKIT_RULE.trim().to_string());
     script_lines.push("RULEEOF".to_string());
-    script_lines.push("systemctl reload polkit 2>/dev/null || killall -HUP polkitd 2>/dev/null || true".to_string());
+    script_lines.push(
+        "systemctl reload polkit 2>/dev/null || killall -HUP polkitd 2>/dev/null || true"
+            .to_string(),
+    );
 
     script_lines.push("echo 'Permissions setup complete!'".to_string());
     script_lines.push("exit 0".to_string());

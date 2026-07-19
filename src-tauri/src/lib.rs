@@ -1,33 +1,37 @@
+mod auth;
+mod battery;
+pub mod environment;
 mod fan_control;
 mod fan_curve;
+mod mcp;
+mod monitor;
+mod performance;
+mod permissions;
+mod security;
+mod settings;
 mod sync;
 mod system_info;
-mod battery;
-mod performance;
-mod monitor;
-mod auth;
-mod permissions;
-mod settings;
-mod security;
-mod mcp;
 
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager, AppHandle,
+    AppHandle, Manager,
 };
 
 #[tauri::command]
 async fn open_url(app: AppHandle, url: String) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
-    app.opener().open_url(&url, None::<&str>)
+    app.opener()
+        .open_url(&url, None::<&str>)
         .map_err(|e| format!("Failed to open URL: {}", e))
 }
 
 #[tauri::command]
 async fn minimize_window(app: AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
-        window.minimize().map_err(|e| format!("Failed to minimize: {}", e))
+        window
+            .minimize()
+            .map_err(|e| format!("Failed to minimize: {}", e))
     } else {
         Err("Window not found".to_string())
     }
@@ -36,11 +40,17 @@ async fn minimize_window(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 async fn toggle_maximize(app: AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
-        let is_maximized = window.is_maximized().map_err(|e| format!("Failed to check maximize state: {}", e))?;
+        let is_maximized = window
+            .is_maximized()
+            .map_err(|e| format!("Failed to check maximize state: {}", e))?;
         if is_maximized {
-            window.unmaximize().map_err(|e| format!("Failed to unmaximize: {}", e))
+            window
+                .unmaximize()
+                .map_err(|e| format!("Failed to unmaximize: {}", e))
         } else {
-            window.maximize().map_err(|e| format!("Failed to maximize: {}", e))
+            window
+                .maximize()
+                .map_err(|e| format!("Failed to maximize: {}", e))
         }
     } else {
         Err("Window not found".to_string())
@@ -60,7 +70,9 @@ async fn close_window(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 async fn start_drag(app: AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
-        window.start_dragging().map_err(|e| format!("Failed to start drag: {}", e))
+        window
+            .start_dragging()
+            .map_err(|e| format!("Failed to start drag: {}", e))
     } else {
         Err("Window not found".to_string())
     }
@@ -81,14 +93,14 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .setup(|app| {
             // Load fan curve config from persistent storage
-            let saved_config = fan_curve::load_config_from_store(&app.handle());
-            let fan_curve_state = fan_curve::FanCurveState::new(std::sync::Mutex::new(saved_config));
+            let saved_config = fan_curve::load_config_from_store(app.handle());
+            let fan_curve_state =
+                fan_curve::FanCurveState::new(std::sync::Mutex::new(saved_config));
             app.manage(fan_curve_state);
 
             // Initialize MCP server state (off by default)
-            let mcp_state = mcp::McpState::new(tokio::sync::Mutex::new(
-                mcp::McpServerState::default(),
-            ));
+            let mcp_state =
+                mcp::McpState::new(tokio::sync::Mutex::new(mcp::McpServerState::default()));
             app.manage(mcp_state);
 
             // Start fan curve background task
@@ -180,6 +192,7 @@ pub fn run() {
             // Fan Control
             fan_control::get_sensor_data,
             fan_control::get_fan_capability,
+            environment::get_system_report,
             fan_control::enable_fan_control,
             fan_control::set_fan_speed,
             fan_control::check_permissions,

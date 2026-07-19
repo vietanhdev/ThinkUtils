@@ -69,14 +69,16 @@ const SETTINGS_KEY: &str = "app_settings";
 /// Save all app settings to persistent storage
 #[tauri::command]
 pub async fn save_app_settings(app: AppHandle, settings: AppSettings) -> Result<(), String> {
-    let store = app.store(STORE_FILE)
+    let store = app
+        .store(STORE_FILE)
         .map_err(|e| format!("Failed to get store: {}", e))?;
 
     let settings_json = serde_json::to_value(&settings)
         .map_err(|e| format!("Failed to serialize settings: {}", e))?;
 
     store.set(SETTINGS_KEY, settings_json);
-    store.save()
+    store
+        .save()
         .map_err(|e| format!("Failed to save store: {}", e))?;
 
     println!("[Settings] All settings saved to store");
@@ -122,37 +124,40 @@ pub async fn update_setting(
     // Update the specific field
     match key.as_str() {
         "fan_mode" => {
-            settings.fan_mode = value.as_str()
-                .ok_or("Invalid fan_mode value")?
-                .to_string();
+            settings.fan_mode = value.as_str().ok_or("Invalid fan_mode value")?.to_string();
         }
         "fan_level" => {
-            settings.fan_level = value.as_i64()
-                .ok_or("Invalid fan_level value")? as i32;
+            settings.fan_level = value.as_i64().ok_or("Invalid fan_level value")? as i32;
         }
         "fan_curve_enabled" => {
-            settings.fan_curve_enabled = value.as_bool()
-                .ok_or("Invalid fan_curve_enabled value")?;
+            settings.fan_curve_enabled =
+                value.as_bool().ok_or("Invalid fan_curve_enabled value")?;
         }
         "battery_start_threshold" => {
-            settings.battery_start_threshold = value.as_i64()
-                .ok_or("Invalid battery_start_threshold value")? as i32;
+            settings.battery_start_threshold = value
+                .as_i64()
+                .ok_or("Invalid battery_start_threshold value")?
+                as i32;
         }
         "battery_stop_threshold" => {
-            settings.battery_stop_threshold = value.as_i64()
-                .ok_or("Invalid battery_stop_threshold value")? as i32;
+            settings.battery_stop_threshold = value
+                .as_i64()
+                .ok_or("Invalid battery_stop_threshold value")?
+                as i32;
         }
         "cpu_governor" => {
-            settings.cpu_governor = value.as_str()
+            settings.cpu_governor = value
+                .as_str()
                 .ok_or("Invalid cpu_governor value")?
                 .to_string();
         }
         "turbo_boost_enabled" => {
-            settings.turbo_boost_enabled = value.as_bool()
-                .ok_or("Invalid turbo_boost_enabled value")?;
+            settings.turbo_boost_enabled =
+                value.as_bool().ok_or("Invalid turbo_boost_enabled value")?;
         }
         "power_profile" => {
-            settings.power_profile = value.as_str()
+            settings.power_profile = value
+                .as_str()
                 .ok_or("Invalid power_profile value")?
                 .to_string();
         }
@@ -162,4 +167,3 @@ pub async fn update_setting(
     // Save updated settings
     save_app_settings(app, settings).await
 }
-

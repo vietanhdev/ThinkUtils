@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::process::Command;
 use std::path::Path;
+use std::process::Command;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SecurityStatus {
@@ -47,7 +47,7 @@ pub struct InstallResponse {
 #[tauri::command]
 pub async fn get_security_status() -> Response<SecurityStatus> {
     let clamav_installed = check_clamav_installed();
-    
+
     if !clamav_installed {
         return Response {
             success: true,
@@ -89,10 +89,7 @@ pub async fn update_virus_definitions() -> Response<String> {
         };
     }
 
-    match Command::new("pkexec")
-        .args(&["freshclam"])
-        .output()
-    {
+    match Command::new("pkexec").args(["freshclam"]).output() {
         Ok(output) => {
             if output.status.success() {
                 Response {
@@ -121,7 +118,7 @@ pub async fn update_virus_definitions() -> Response<String> {
 #[tauri::command]
 pub async fn scan_path(path: String) -> Response<ScanResult> {
     let mut logs = Vec::new();
-    
+
     if !check_clamav_installed() {
         logs.push("✗ ClamAV is not installed".to_string());
         return Response {
@@ -142,17 +139,14 @@ pub async fn scan_path(path: String) -> Response<ScanResult> {
 
     logs.push(format!("Starting scan of: {}", path));
     logs.push("Running ClamAV scanner...".to_string());
-    
+
     let start_time = std::time::Instant::now();
 
-    match Command::new("clamscan")
-        .args(&["-r", "-v", &path])
-        .output()
-    {
+    match Command::new("clamscan").args(["-r", "-v", &path]).output() {
         Ok(output) => {
             let scan_time = format!("{:.2}s", start_time.elapsed().as_secs_f64());
             let stdout = String::from_utf8_lossy(&output.stdout);
-            
+
             // Add scan output to logs (limit to important lines)
             let mut file_count = 0;
             for line in stdout.lines() {
@@ -163,17 +157,26 @@ pub async fn scan_path(path: String) -> Response<ScanResult> {
                     } else if file_count == 21 {
                         logs.push("  ... (scanning continues)".to_string());
                     }
-                } else if line.contains("FOUND") || line.contains("Infected files") || line.contains("Scanned files") {
+                } else if line.contains("FOUND")
+                    || line.contains("Infected files")
+                    || line.contains("Scanned files")
+                {
                     logs.push(format!("  {}", line.trim()));
                 }
             }
-            
+
             let (scanned, infected, threats) = parse_scan_output(&stdout);
 
             if infected > 0 {
-                logs.push(format!("⚠ Found {} threat(s) in {} file(s)", infected, scanned));
+                logs.push(format!(
+                    "⚠ Found {} threat(s) in {} file(s)",
+                    infected, scanned
+                ));
             } else {
-                logs.push(format!("✓ Scan complete: {} files scanned, no threats found", scanned));
+                logs.push(format!(
+                    "✓ Scan complete: {} files scanned, no threats found",
+                    scanned
+                ));
             }
             logs.push(format!("Scan completed in {}", scan_time));
 
@@ -214,7 +217,7 @@ pub async fn scan_path(path: String) -> Response<ScanResult> {
 #[tauri::command]
 pub async fn quick_scan() -> Response<ScanResult> {
     let mut logs = Vec::new();
-    
+
     if !check_clamav_installed() {
         logs.push("✗ ClamAV is not installed".to_string());
         return Response {
@@ -223,7 +226,7 @@ pub async fn quick_scan() -> Response<ScanResult> {
             error: Some("ClamAV is not installed".to_string()),
         };
     }
-    
+
     let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
     let scan_paths = vec![
         format!("{}/Downloads", home_dir),
@@ -232,7 +235,7 @@ pub async fn quick_scan() -> Response<ScanResult> {
     ];
 
     logs.push("Starting quick scan of common directories...".to_string());
-    
+
     let mut total_scanned = 0;
     let mut total_infected = 0;
     let mut all_threats = Vec::new();
@@ -246,19 +249,19 @@ pub async fn quick_scan() -> Response<ScanResult> {
 
         logs.push(format!("Scanning: {}", path));
 
-        if let Ok(output) = Command::new("clamscan")
-            .args(&["-r", &path])
-            .output()
-        {
+        if let Ok(output) = Command::new("clamscan").args(["-r", &path]).output() {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let (scanned, infected, mut threats) = parse_scan_output(&stdout);
-            
+
             if infected > 0 {
-                logs.push(format!("  ⚠ Found {} threat(s) in {} file(s)", infected, scanned));
+                logs.push(format!(
+                    "  ⚠ Found {} threat(s) in {} file(s)",
+                    infected, scanned
+                ));
             } else {
                 logs.push(format!("  ✓ Clean - {} files scanned", scanned));
             }
-            
+
             total_scanned += scanned;
             total_infected += infected;
             all_threats.append(&mut threats);
@@ -270,9 +273,15 @@ pub async fn quick_scan() -> Response<ScanResult> {
     let scan_time = format!("{:.2}s", start_time.elapsed().as_secs_f64());
 
     if total_infected > 0 {
-        logs.push(format!("⚠ Quick scan complete: {} threat(s) found in {} file(s)", total_infected, total_scanned));
+        logs.push(format!(
+            "⚠ Quick scan complete: {} threat(s) found in {} file(s)",
+            total_infected, total_scanned
+        ));
     } else {
-        logs.push(format!("✓ Quick scan complete: {} files scanned, no threats found", total_scanned));
+        logs.push(format!(
+            "✓ Quick scan complete: {} files scanned, no threats found",
+            total_scanned
+        ));
     }
     logs.push(format!("Total scan time: {}", scan_time));
 
@@ -296,7 +305,7 @@ pub async fn quick_scan() -> Response<ScanResult> {
 pub async fn install_clamav() -> InstallResponse {
     let distro = detect_linux_distro();
     let mut logs = vec![format!("Detected distribution: {}", distro)];
-    
+
     match distro.as_str() {
         "debian" | "ubuntu" | "linuxmint" | "pop" => {
             logs.push("Using APT package manager".to_string());
@@ -338,7 +347,7 @@ fn detect_linux_distro() -> String {
             }
         }
     }
-    
+
     // Fallback checks
     if Path::new("/etc/debian_version").exists() {
         return "debian".to_string();
@@ -349,34 +358,34 @@ fn detect_linux_distro() -> String {
     if Path::new("/etc/arch-release").exists() {
         return "arch".to_string();
     }
-    
+
     "unknown".to_string()
 }
 
 fn install_with_apt(mut logs: Vec<String>) -> InstallResponse {
     logs.push("Running: pkexec apt-get install -y clamav clamav-daemon".to_string());
-    
+
     match Command::new("pkexec")
-        .args(&["apt-get", "install", "-y", "clamav", "clamav-daemon"])
+        .args(["apt-get", "install", "-y", "clamav", "clamav-daemon"])
         .output()
     {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
-            
+
             // Add output to logs
             for line in stdout.lines() {
                 if !line.trim().is_empty() {
                     logs.push(format!("  {}", line));
                 }
             }
-            
+
             if output.status.success() {
                 logs.push("✓ ClamAV packages installed successfully".to_string());
                 logs.push("Updating virus definitions...".to_string());
-                
+
                 // Update definitions after install
-                match Command::new("pkexec").args(&["freshclam"]).output() {
+                match Command::new("pkexec").args(["freshclam"]).output() {
                     Ok(fresh_output) => {
                         let fresh_stdout = String::from_utf8_lossy(&fresh_output.stdout);
                         for line in fresh_stdout.lines().take(10) {
@@ -391,10 +400,13 @@ fn install_with_apt(mut logs: Vec<String>) -> InstallResponse {
                         }
                     }
                     Err(_) => {
-                        logs.push("⚠ Could not update definitions (run 'Update Definitions' manually)".to_string());
+                        logs.push(
+                            "⚠ Could not update definitions (run 'Update Definitions' manually)"
+                                .to_string(),
+                        );
                     }
                 }
-                
+
                 InstallResponse {
                     success: true,
                     message: "ClamAV installed successfully".to_string(),
@@ -408,7 +420,7 @@ fn install_with_apt(mut logs: Vec<String>) -> InstallResponse {
                     }
                 }
                 logs.push("✗ Installation failed".to_string());
-                
+
                 InstallResponse {
                     success: false,
                     message: String::new(),
@@ -431,26 +443,26 @@ fn install_with_apt(mut logs: Vec<String>) -> InstallResponse {
 
 fn install_with_dnf(mut logs: Vec<String>) -> InstallResponse {
     logs.push("Running: pkexec dnf install -y clamav clamav-update clamd".to_string());
-    
+
     match Command::new("pkexec")
-        .args(&["dnf", "install", "-y", "clamav", "clamav-update", "clamd"])
+        .args(["dnf", "install", "-y", "clamav", "clamav-update", "clamd"])
         .output()
     {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
-            
+
             for line in stdout.lines() {
                 if !line.trim().is_empty() {
                     logs.push(format!("  {}", line));
                 }
             }
-            
+
             if output.status.success() {
                 logs.push("✓ ClamAV packages installed successfully".to_string());
                 logs.push("Updating virus definitions...".to_string());
-                
-                match Command::new("pkexec").args(&["freshclam"]).output() {
+
+                match Command::new("pkexec").args(["freshclam"]).output() {
                     Ok(fresh_output) => {
                         let fresh_stdout = String::from_utf8_lossy(&fresh_output.stdout);
                         for line in fresh_stdout.lines().take(10) {
@@ -468,7 +480,7 @@ fn install_with_dnf(mut logs: Vec<String>) -> InstallResponse {
                         logs.push("⚠ Could not update definitions".to_string());
                     }
                 }
-                
+
                 InstallResponse {
                     success: true,
                     message: "ClamAV installed successfully".to_string(),
@@ -482,7 +494,7 @@ fn install_with_dnf(mut logs: Vec<String>) -> InstallResponse {
                     }
                 }
                 logs.push("✗ Installation failed".to_string());
-                
+
                 InstallResponse {
                     success: false,
                     message: String::new(),
@@ -505,26 +517,26 @@ fn install_with_dnf(mut logs: Vec<String>) -> InstallResponse {
 
 fn install_with_pacman(mut logs: Vec<String>) -> InstallResponse {
     logs.push("Running: pkexec pacman -S --noconfirm clamav".to_string());
-    
+
     match Command::new("pkexec")
-        .args(&["pacman", "-S", "--noconfirm", "clamav"])
+        .args(["pacman", "-S", "--noconfirm", "clamav"])
         .output()
     {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
-            
+
             for line in stdout.lines() {
                 if !line.trim().is_empty() {
                     logs.push(format!("  {}", line));
                 }
             }
-            
+
             if output.status.success() {
                 logs.push("✓ ClamAV packages installed successfully".to_string());
                 logs.push("Updating virus definitions...".to_string());
-                
-                match Command::new("pkexec").args(&["freshclam"]).output() {
+
+                match Command::new("pkexec").args(["freshclam"]).output() {
                     Ok(fresh_output) => {
                         let fresh_stdout = String::from_utf8_lossy(&fresh_output.stdout);
                         for line in fresh_stdout.lines().take(10) {
@@ -542,7 +554,7 @@ fn install_with_pacman(mut logs: Vec<String>) -> InstallResponse {
                         logs.push("⚠ Could not update definitions".to_string());
                     }
                 }
-                
+
                 InstallResponse {
                     success: true,
                     message: "ClamAV installed successfully".to_string(),
@@ -556,7 +568,7 @@ fn install_with_pacman(mut logs: Vec<String>) -> InstallResponse {
                     }
                 }
                 logs.push("✗ Installation failed".to_string());
-                
+
                 InstallResponse {
                     success: false,
                     message: String::new(),
@@ -579,26 +591,26 @@ fn install_with_pacman(mut logs: Vec<String>) -> InstallResponse {
 
 fn install_with_zypper(mut logs: Vec<String>) -> InstallResponse {
     logs.push("Running: pkexec zypper install -y clamav".to_string());
-    
+
     match Command::new("pkexec")
-        .args(&["zypper", "install", "-y", "clamav"])
+        .args(["zypper", "install", "-y", "clamav"])
         .output()
     {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
-            
+
             for line in stdout.lines() {
                 if !line.trim().is_empty() {
                     logs.push(format!("  {}", line));
                 }
             }
-            
+
             if output.status.success() {
                 logs.push("✓ ClamAV packages installed successfully".to_string());
                 logs.push("Updating virus definitions...".to_string());
-                
-                match Command::new("pkexec").args(&["freshclam"]).output() {
+
+                match Command::new("pkexec").args(["freshclam"]).output() {
                     Ok(fresh_output) => {
                         let fresh_stdout = String::from_utf8_lossy(&fresh_output.stdout);
                         for line in fresh_stdout.lines().take(10) {
@@ -616,7 +628,7 @@ fn install_with_zypper(mut logs: Vec<String>) -> InstallResponse {
                         logs.push("⚠ Could not update definitions".to_string());
                     }
                 }
-                
+
                 InstallResponse {
                     success: true,
                     message: "ClamAV installed successfully".to_string(),
@@ -630,7 +642,7 @@ fn install_with_zypper(mut logs: Vec<String>) -> InstallResponse {
                     }
                 }
                 logs.push("✗ Installation failed".to_string());
-                
+
                 InstallResponse {
                     success: false,
                     message: String::new(),
@@ -672,7 +684,7 @@ fn check_clamav_installed() -> bool {
 
 fn check_clamd_running() -> bool {
     Command::new("systemctl")
-        .args(&["is-active", "clamav-daemon"])
+        .args(["is-active", "clamav-daemon"])
         .output()
         .map(|output| output.status.success())
         .unwrap_or(false)
@@ -689,13 +701,13 @@ fn get_database_info() -> (String, String, String) {
 
     for db_path in db_paths {
         if Path::new(db_path).exists() {
-            match Command::new("sigtool").args(&["--info", db_path]).output() {
+            match Command::new("sigtool").args(["--info", db_path]).output() {
                 Ok(output) if output.status.success() => {
                     let info = String::from_utf8_lossy(&output.stdout);
                     let version = extract_field(&info, "Version:");
                     let signatures = extract_field(&info, "Signatures:");
                     let build_time = extract_field(&info, "Build time:");
-                    
+
                     // If we got valid data, return it
                     if version != "Unknown" || signatures != "Unknown" {
                         return (version, build_time, signatures);
@@ -707,7 +719,11 @@ fn get_database_info() -> (String, String, String) {
     }
 
     // If no database files found or readable, check if freshclam needs to run
-    ("Not initialized".to_string(), "Never".to_string(), "0".to_string())
+    (
+        "Not initialized".to_string(),
+        "Never".to_string(),
+        "0".to_string(),
+    )
 }
 
 fn extract_field(text: &str, field: &str) -> String {
