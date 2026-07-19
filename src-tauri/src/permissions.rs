@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
+use crate::fan_control::{HELPER_PATH, HELPER_SCRIPT, POLKIT_RULE, POLKIT_RULE_PATH};
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiResponse<T> {
     pub success: bool,
@@ -42,6 +44,19 @@ pub async fn check_permissions_status() -> ApiResponse<PermissionStatus> {
         }
     }
 
+    // Also check if fan control helper + polkit rule are installed
+    // Only check the helper — /etc/polkit-1/rules.d/ is root-only so
+    // Path::exists() on the polkit rule always fails for normal users.
+    if !Path::new(HELPER_PATH).exists() {
+        // Can we at least write to the fan file directly?
+        let fan_path = "/proc/acpi/ibm/fan";
+        if Path::new(fan_path).exists() {
+            if fs::OpenOptions::new().write(true).open(fan_path).is_err() {
+                missing_files.push("Fan control helper (not installed)".to_string());
+            }
+        }
+    }
+
     let has_permissions = missing_files.is_empty();
 
     ApiResponse {
@@ -59,6 +74,15 @@ pub async fn setup_permissions() -> ApiResponse<String> {
     println!("[Permissions] Setting up file permissions...");
 
     let username = std::env::var("USER").unwrap_or_else(|_| "root".to_string());
+
+    // Validate username to prevent command injection (only allow alphanumeric, dash, underscore)
+    if !username.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+        return ApiResponse {
+            success: false,
+            data: None,
+            error: Some("Invalid username detected".to_string()),
+        };
+    }
 
     // Create a script that sets up all permissions
     let mut script_lines = vec![
@@ -86,37 +110,83 @@ pub async fn setup_permissions() -> ApiResponse<String> {
         script_lines.push("fi".to_string());
     }
 
+    // Also install the fan control helper + polkit rule so the user
+    // doesn't have to click "Grant Permissions" again on the fan page.
+    // Uses shared constants from fan_control module to avoid duplication.
+    script_lines.push(format!("cat > {} << 'HELPEREOF'", HELPER_PATH));
+    script_lines.push(HELPER_SCRIPT.trim().to_string());
+    script_lines.push("HELPEREOF".to_string());
+    script_lines.push(format!("chmod 755 {}", HELPER_PATH));
+
+    script_lines.push("mkdir -p /etc/polkit-1/rules.d".to_string());
+    script_lines.push(format!("cat > {} << 'RULEEOF'", POLKIT_RULE_PATH));
+    script_lines.push(POLKIT_RULE.trim().to_string());
+    script_lines.push("RULEEOF".to_string());
+    script_lines.push("systemctl reload polkit 2>/dev/null || killall -HUP polkitd 2>/dev/null || true".to_string());
+
     script_lines.push("echo 'Permissions setup complete!'".to_string());
     script_lines.push("exit 0".to_string());
 
     let script_content = script_lines.join("\n");
-    let temp_script = "/tmp/thinkutils_setup_perms.sh";
 
-    if let Err(e) = fs::write(temp_script, script_content) {
-        return ApiResponse {
-            success: false,
-            data: None,
-            error: Some(format!("Failed to create setup script: {}", e)),
-        };
-    }
+    // Secure temp file creation (random name, O_EXCL to prevent symlink attacks)
+    let random = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let temp_script = format!("/tmp/thinkutils_perms_{}.sh", random);
 
-    // Make it executable
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::Permissions::from_mode(0o755);
-        let _ = fs::set_permissions(temp_script, perms);
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+
+        let mut file = match fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .mode(0o700)
+            .open(&temp_script)
+        {
+            Ok(f) => f,
+            Err(e) => {
+                return ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some(format!("Failed to create setup script: {}", e)),
+                };
+            }
+        };
+
+        if let Err(e) = file.write_all(script_content.as_bytes()) {
+            let _ = fs::remove_file(&temp_script);
+            return ApiResponse {
+                success: false,
+                data: None,
+                error: Some(format!("Failed to write setup script: {}", e)),
+            };
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        if let Err(e) = fs::write(&temp_script, &script_content) {
+            return ApiResponse {
+                success: false,
+                data: None,
+                error: Some(format!("Failed to create setup script: {}", e)),
+            };
+        }
     }
 
     // Run with pkexec - this will prompt for password once
     match tokio::process::Command::new("pkexec")
         .arg("bash")
-        .arg(temp_script)
+        .arg(&temp_script)
         .output()
         .await
     {
         Ok(output) => {
-            let _ = fs::remove_file(temp_script);
+            let _ = fs::remove_file(&temp_script);
 
             if output.status.success() {
                 println!("[Permissions] ✓ Permissions setup successful");
@@ -136,7 +206,7 @@ pub async fn setup_permissions() -> ApiResponse<String> {
             }
         }
         Err(e) => {
-            let _ = fs::remove_file(temp_script);
+            let _ = fs::remove_file(&temp_script);
             println!("[Permissions] ✗ Failed to execute pkexec: {}", e);
             ApiResponse {
                 success: false,

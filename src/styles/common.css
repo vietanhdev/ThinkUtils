@@ -41,11 +41,22 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, Inter, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: var(--bg-primary);
+  background: transparent;
   color: var(--text-primary);
   overflow: hidden;
   font-size: 14px;
   line-height: 1.5;
+}
+
+/* Rounded window container */
+.window-container {
+  background: var(--bg-primary);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Custom Titlebar */
@@ -59,11 +70,8 @@ body {
   padding: 0 12px;
   user-select: none;
   -webkit-app-region: drag;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;
+  flex-shrink: 0;
+  border-radius: 12px 12px 0 0;
 }
 
 .titlebar-left {
@@ -125,8 +133,7 @@ body {
 
 .app-layout {
   display: flex;
-  height: calc(100vh - 32px);
-  margin-top: 32px;
+  flex: 1;
   overflow: hidden;
 }
 
@@ -141,6 +148,7 @@ body {
   padding: 16px 0;
   transition: width 0.3s ease;
   height: 100%;
+  border-radius: 0 0 0 12px;
 }
 
 .sidebar-nav:hover {

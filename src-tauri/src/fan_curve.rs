@@ -210,8 +210,12 @@ fn get_cpu_temperature() -> Result<i32, String> {
     Err("Could not read CPU temperature".to_string())
 }
 
-/// Set fan speed using the fan_control module
-fn set_fan_speed_internal(level: i32) -> Result<(), String> {
+const HELPER_PATH: &str = "/usr/local/bin/thinkutils-fan-control";
+
+/// Set fan speed with pkexec fallback using the dedicated helper script.
+/// Only attempts pkexec if the helper and polkit rule are both installed
+/// (guaranteeing passwordless operation for the background task).
+async fn set_fan_speed_internal(level: i32) -> Result<(), String> {
     use std::fs;
     use std::io::Write;
 
@@ -223,15 +227,31 @@ fn set_fan_speed_internal(level: i32) -> Result<(), String> {
         return Err("Invalid fan level".to_string());
     };
 
-    let mut file = fs::OpenOptions::new()
-        .write(true)
-        .open(fan_level_path)
-        .map_err(|e| format!("Failed to open fan control: {}", e))?;
+    // Try direct write first
+    if let Ok(mut file) = fs::OpenOptions::new().write(true).open(fan_level_path) {
+        if file.write_all(command.as_bytes()).is_ok() {
+            return Ok(());
+        }
+    }
 
-    file.write_all(command.as_bytes())
-        .map_err(|e| format!("Failed to write fan level: {}", e))?;
+    // Use dedicated helper if installed (polkit rule grants passwordless access).
+    // We only check the helper because /etc/polkit-1/rules.d/ is root-only.
+    if !std::path::Path::new(HELPER_PATH).exists() {
+        return Err("No write permission. Grant permissions to enable fan curve mode.".to_string());
+    }
 
-    Ok(())
+    let output = tokio::process::Command::new("pkexec")
+        .arg(HELPER_PATH)
+        .arg(&command)
+        .output()
+        .await
+        .map_err(|e| format!("Failed to execute helper: {}", e))?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err("Failed to set fan speed via helper".to_string())
+    }
 }
 
 /// Background task that monitors temperature and adjusts fan speed
@@ -239,6 +259,7 @@ pub async fn fan_curve_background_task(app: AppHandle) {
     let state = app.state::<FanCurveState>();
     let mut last_level: Option<i32> = None;
     let mut error_count = 0;
+    let mut permission_error_reported = false;
     const MAX_ERRORS: i32 = 5;
 
     loop {
@@ -256,6 +277,7 @@ pub async fn fan_curve_background_task(app: AppHandle) {
 
         if !config.enabled {
             last_level = None;
+            permission_error_reported = false;
             continue;
         }
 
@@ -276,25 +298,35 @@ pub async fn fan_curve_background_task(app: AppHandle) {
         // Calculate target fan level
         let target_level = calculate_fan_level(temp, &config.points);
 
-        // Only update if level changed (avoid unnecessary writes)
+        // Only write to fan hardware when level actually changes
         if last_level != Some(target_level) {
-            match set_fan_speed_internal(target_level) {
+            match set_fan_speed_internal(target_level).await {
                 Ok(_) => {
                     println!("[Fan Curve] Temp: {}°C -> Fan Level: {}", temp, target_level);
                     last_level = Some(target_level);
-
-                    // Emit event to frontend for UI update
-                    if let Err(e) = app.emit_to("main", "fan-curve-update", serde_json::json!({
-                        "temperature": temp,
-                        "fan_level": target_level,
-                    })) {
-                        eprintln!("[Fan Curve] Failed to emit event: {}", e);
-                    }
+                    permission_error_reported = false;
                 }
                 Err(e) => {
                     eprintln!("[Fan Curve] Failed to set fan speed: {}", e);
+
+                    // Notify frontend once about permission issues
+                    if !permission_error_reported {
+                        permission_error_reported = true;
+                        let _ = app.emit_to("main", "fan-curve-error", serde_json::json!({
+                            "error": e,
+                        }));
+                    }
                 }
             }
+        }
+
+        // Always emit temperature and current level to frontend for live UI updates
+        let display_level = last_level.unwrap_or(target_level);
+        if let Err(e) = app.emit_to("main", "fan-curve-update", serde_json::json!({
+            "temperature": temp,
+            "fan_level": display_level,
+        })) {
+            eprintln!("[Fan Curve] Failed to emit event: {}", e);
         }
     }
 }

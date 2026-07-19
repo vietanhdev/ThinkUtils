@@ -13,6 +13,7 @@
 @import url('./styles/sync.css');
 @import url('./styles/system.css');
 @import url('./styles/security.css');
+@import url('./styles/mcp.css');
 
 /* Import dialog styles */
 @import url('./styles/dialogs.css');

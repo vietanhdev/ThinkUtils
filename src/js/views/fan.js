@@ -125,6 +125,17 @@ function updateUIFromFanLevel(level) {
 
   const levelStr = level.toString().toLowerCase();
 
+  // Detect external changes (e.g. from MCP server) by comparing the
+  // actual hardware level with what the UI last set. If they differ,
+  // clear the cache so the user can set the same mode again.
+  const lastSet = getState('lastFanSpeedSet');
+  if (lastSet !== null) {
+    const lastNormalized = lastSet === 'full-speed' ? 'disengaged' : lastSet;
+    if (levelStr !== lastNormalized) {
+      setState('lastFanSpeedSet', null);
+    }
+  }
+
   [elements.btnAuto, elements.btnManual, elements.btnCurve, elements.btnFull].forEach((btn) => {
     btn.classList.remove('active');
   });
@@ -157,6 +168,12 @@ async function setFanMode(mode, level = null) {
   if (getState('fanControlInProgress')) {
     showStatus('Please wait...', 'info');
     return;
+  }
+
+  // When leaving curve mode, reset the speed cache since the background task
+  // may have changed the fan level independently
+  if (getState('currentFanMode') === 'curve' && mode !== 'curve') {
+    setState('lastFanSpeedSet', null);
   }
 
   setState('currentFanMode', mode);
@@ -278,14 +295,14 @@ export { setFanMode };
 
 async function tryUpdatePermissions() {
   try {
-    showStatus('Requesting permissions...', 'info');
+    showStatus('Setting up permissions...', 'info');
 
-    const response = await invoke('update_permissions');
+    // Use the comprehensive setup that handles sysfs + fan helper + polkit rule
+    const response = await invoke('setup_permissions');
 
     if (response.success) {
-      showStatus('✓ Permissions granted!', 'success');
+      showStatus('✓ Permissions granted! Please restart for full effect.', 'success');
       elements.permissionHelper.style.display = 'none';
-      await checkInitialPermissions();
     } else {
       showStatus(`Failed: ${response.error}`, 'error');
     }

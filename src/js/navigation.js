@@ -8,6 +8,7 @@ import { loadBatteryInfo } from './views/battery.js';
 import { loadPerformanceInfo } from './views/performance.js';
 import { startMonitoring } from './views/monitor.js';
 import { loadSecurityStatus } from './views/security.js';
+import { loadMcpStatus, setupMcpView } from './views/mcp.js';
 
 export function setupFeatureNavigation() {
   const menuItems = document.querySelectorAll('.menu-item');
@@ -61,6 +62,9 @@ export function switchView(view) {
   if (elements.securityView) {
     elements.securityView.style.display = 'none';
   }
+  if (elements.mcpView) {
+    elements.mcpView.style.display = 'none';
+  }
 
   // Update page title
   const titles = {
@@ -71,7 +75,8 @@ export function switchView(view) {
     monitor: { title: 'System Monitor', subtitle: 'Real-time resource monitoring' },
     system: { title: 'System Info', subtitle: 'Your ThinkPad details' },
     sync: { title: 'Cloud Sync', subtitle: 'Sync settings across devices' },
-    security: { title: 'Security', subtitle: 'Antivirus protection and security settings' }
+    security: { title: 'Security', subtitle: 'Antivirus protection and security settings' },
+    mcp: { title: 'AI Integration', subtitle: 'MCP server for AI assistants' }
   };
 
   if (titles[view] && elements.pageTitle && elements.pageSubtitle) {
@@ -126,6 +131,13 @@ export function switchView(view) {
       if (elements.securityView) {
         elements.securityView.style.display = 'block';
         loadSecurityStatus();
+      }
+      break;
+    case 'mcp':
+      if (elements.mcpView) {
+        elements.mcpView.style.display = 'block';
+        setupMcpView();
+        loadMcpStatus();
       }
       break;
   }

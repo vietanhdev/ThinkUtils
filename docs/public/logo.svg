@@ -1,0 +1,21 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Subtle texture pattern -->
+    <pattern id="texture" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
+      <circle cx="4" cy="4" r="0.5" fill="#FFFFFF" opacity="0.08"/>
+    </pattern>
+  </defs>
+  
+  <!-- Background rounded square -->
+  <rect width="512" height="512" rx="85.33" fill="#1A1A1A"/>
+  
+  <!-- Main TrackPoint-inspired button - flat red -->
+  <rect x="116" y="116" width="280" height="280" rx="56" fill="#E4002B"/>
+  
+  <!-- Texture overlay -->
+  <rect x="116" y="116" width="280" height="280" rx="56" fill="url(#texture)"/>
+  
+  <!-- Center indicator dot (like TrackPoint cap texture) -->
+  <circle cx="256" cy="256" r="10" fill="#FFFFFF" opacity="0.25"/>
+  <circle cx="256" cy="256" r="5" fill="#FFFFFF" opacity="0.4"/>
+</svg>
