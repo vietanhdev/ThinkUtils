@@ -295,31 +295,53 @@ jobs:
   gui-launch:
     needs: [rust, frontend]
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # Built INSIDE a 22.04 container, matching release.yml, because Tauri links
+    # against the build host's glibc. The first run of this job built on the
+    # 24.04 runner (glibc 2.39) and the resulting binary refused to start on
+    # Ubuntu 22.04 with "GLIBC_2.39 not found" -- so CI was testing a binary no
+    # user would ever receive. Pinning the floor here is the same reason
+    # release.yml stays on 22.04.
+    container:
+      image: ubuntu:22.04
+    defaults:
+      run:
+        # A bare container runs `run:` steps under dash, which has no pipefail.
+        shell: bash
+    timeout-minutes: 60
     steps:
+      # Must precede checkout: the action needs git in the container, and running
+      # as root over a runner-owned workspace trips git's dubious-ownership guard.
+      - name: Bootstrap the 22.04 build image
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl file git pkg-config build-essential \
+            libssl-dev rpm xz-utils sudo \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf xdg-utils
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: package-lock.json
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-
-      - name: Install Tauri build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
-            librsvg2-dev patchelf build-essential file libssl-dev rpm
 
       - run: npm ci
 
       # Built here rather than downloaded, so a PR is tested before anything is
       # ever published.
       - name: Build the real packages
+        # linuxdeploy is itself an AppImage and mounts via FUSE, which a container
+        # does not have. Without this the bundle step dies on a fuse error AFTER
+        # the .deb and .rpm have already built.
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
         run: npm run tauri build
 
       - name: List what was built
