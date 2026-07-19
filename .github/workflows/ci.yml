@@ -292,15 +292,17 @@ jobs:
   # proves the app starts, renders its full UI, and degrades cleanly when
   # /proc/acpi/ibm/fan is absent -- the environment a bug is most likely to hide
   # in. See the header of the script for how it tells those states apart.
-  gui-launch:
+  # Split in two on purpose. The packages must be BUILT on the glibc floor
+  # (ubuntu:22.04) or the binary requires GLIBC_2.39 and will not start on
+  # 22.04 or Debian 12 -- CI would be testing something no user receives. But a
+  # job running inside a container cannot spawn the sibling containers the
+  # launch test needs; the first attempt failed with "docker: command not found".
+  #
+  # So: build in the container, hand the artifacts to a normal runner, and let
+  # that runner drive Docker.
+  bundle:
     needs: [rust, frontend]
     runs-on: ubuntu-24.04
-    # Built INSIDE a 22.04 container, matching release.yml, because Tauri links
-    # against the build host's glibc. The first run of this job built on the
-    # 24.04 runner (glibc 2.39) and the resulting binary refused to start on
-    # Ubuntu 22.04 with "GLIBC_2.39 not found" -- so CI was testing a binary no
-    # user would ever receive. Pinning the floor here is the same reason
-    # release.yml stays on 22.04.
     container:
       image: ubuntu:22.04
     defaults:
@@ -318,7 +320,7 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends \
             ca-certificates curl file git jq pkg-config build-essential \
-            libssl-dev rpm xz-utils sudo \
+            libssl-dev rpm xz-utils sudo binutils \
             libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
             librsvg2-dev patchelf xdg-utils
           git config --global --add safe.directory "${GITHUB_WORKSPACE}"
@@ -334,8 +336,6 @@ jobs:
 
       - run: npm ci
 
-      # Built here rather than downloaded, so a PR is tested before anything is
-      # ever published.
       - name: Build the real packages
         # linuxdeploy is itself an AppImage and mounts via FUSE, which a container
         # does not have. Without this the bundle step dies on a fuse error AFTER
@@ -344,8 +344,55 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: 1
         run: npm run tauri build
 
-      - name: List what was built
-        run: find src-tauri/target/release/bundle -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' \) -print
+      - name: Confirm the glibc floor
+        run: |
+          set -euo pipefail
+          # The whole reason this job runs in a container. Report a floor breach
+          # here rather than letting a user discover it as a broken download.
+          floor=$(objdump -T src-tauri/target/release/thinkutils \
+            | grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sort -uV | tail -1)
+          echo "highest glibc symbol required: ${floor}"
+          case "${floor}" in
+            GLIBC_2.3[6-9]|GLIBC_2.[4-9][0-9]|GLIBC_[3-9]*)
+              echo "::error::binary requires ${floor}, above the Ubuntu 22.04 floor (2.35)"
+              exit 1 ;;
+          esac
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/bundle/appimage/*.AppImage
+          retention-days: 7
+
+  # Everything above proves the code COMPILES. Not one job starts the app. A
+  # Tauri binary can pass every check here and still die on launch with a dlopen
+  # panic, or come up showing an empty window because the frontend never mounted.
+  gui-launch:
+    needs: bundle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: artifacts
+
+      # The script expects Tauri's bundle layout, not a flat artifact directory.
+      - name: Restore the bundle layout
+        run: |
+          set -euo pipefail
+          for kind in deb rpm appimage; do
+            mkdir -p "src-tauri/target/release/bundle/${kind}"
+          done
+          find artifacts -name '*.deb'      -exec mv {} src-tauri/target/release/bundle/deb/ ';'
+          find artifacts -name '*.rpm'      -exec mv {} src-tauri/target/release/bundle/rpm/ ';'
+          find artifacts -name '*.AppImage' -exec mv {} src-tauri/target/release/bundle/appimage/ ';'
+          find src-tauri/target/release/bundle -type f -print
 
       - name: Launch-test the packages in clean containers
         run: scripts/test-gui-packages-docker.sh
