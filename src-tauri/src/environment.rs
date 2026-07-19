@@ -56,14 +56,130 @@ impl PackageManager {
             (_, Tool::Sensors) => "lm_sensors",
             (PackageManager::Apt, Tool::Polkit) => "policykit-1",
             (_, Tool::Polkit) => "polkit",
+            // These happen to share a name across all four package managers.
+            // Kept explicit rather than defaulted so a divergence is a compile
+            // error here instead of a wrong command shown to a user.
+            (_, Tool::Clamav) => "clamav",
+            (_, Tool::PowerProfiles) => "power-profiles-daemon",
+            (_, Tool::Tlp) => "tlp",
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// An external program the app shells out to.
+///
+/// Only tools whose absence changes what the app can do. Coreutils and shell
+/// builtins (`ps`, `df`, `sh`) are deliberately excluded — they are present
+/// everywhere, and listing them would bury the ones that matter.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Tool {
     Sensors,
     Polkit,
+    Clamav,
+    PowerProfiles,
+    Tlp,
+}
+
+impl Tool {
+    pub fn all() -> &'static [Tool] {
+        &[
+            Tool::Polkit,
+            Tool::Sensors,
+            Tool::PowerProfiles,
+            Tool::Tlp,
+            Tool::Clamav,
+        ]
+    }
+
+    /// The binary to probe for. `pkexec` rather than `polkitd`, because what
+    /// matters is whether we can *invoke* elevation, not whether a daemon exists.
+    pub fn binary(&self) -> &'static str {
+        match self {
+            Tool::Sensors => "sensors",
+            Tool::Polkit => "pkexec",
+            Tool::Clamav => "clamscan",
+            Tool::PowerProfiles => "powerprofilesctl",
+            Tool::Tlp => "tlp-stat",
+        }
+    }
+
+    /// What the user loses without it. Phrased as capability, not as an error —
+    /// most of these are optional and the app is still useful without them.
+    pub fn enables(&self) -> &'static str {
+        match self {
+            Tool::Sensors => "Temperature readings, and the fan curve that follows them",
+            Tool::Polkit => "Fan, CPU and battery changes",
+            Tool::Clamav => "Virus scanning on the Security page",
+            Tool::PowerProfiles => "Power profile switching (Balanced, Performance, Power Saver)",
+            Tool::Tlp => "TLP power management status",
+        }
+    }
+
+    /// Required tools gate core hardware control; optional ones gate one feature.
+    pub fn required(&self) -> bool {
+        matches!(self, Tool::Polkit)
+    }
+
+    /// Tlp and PowerProfiles are alternative approaches to the same job, and
+    /// installing both causes them to fight. Neither is missing if the other
+    /// is present.
+    pub fn satisfied_by(&self) -> Option<Tool> {
+        match self {
+            Tool::PowerProfiles => Some(Tool::Tlp),
+            Tool::Tlp => Some(Tool::PowerProfiles),
+            _ => None,
+        }
+    }
+}
+
+/// Whether a tool is present, and how to get it if not.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ToolStatus {
+    pub tool: Tool,
+    pub binary: String,
+    pub present: bool,
+    pub required: bool,
+    pub enables: String,
+    /// None when the tool is present, or when the distro is unrecognised and we
+    /// would otherwise print a command that cannot work.
+    pub install_command: Option<String>,
+}
+
+/// Report on every tool, given a probe for whether a binary exists.
+///
+/// The probe is injected so this stays testable without touching the real PATH.
+pub fn survey_tools(pm: &PackageManager, is_present: &dyn Fn(&str) -> bool) -> Vec<ToolStatus> {
+    let present: Vec<bool> = Tool::all().iter().map(|t| is_present(t.binary())).collect();
+
+    Tool::all()
+        .iter()
+        .enumerate()
+        .map(|(i, tool)| {
+            // A tool with a satisfied_by alternative is not "missing" when its
+            // counterpart is installed -- suggesting both invites a conflict.
+            let alternative_present = tool.satisfied_by().is_some_and(|alt| {
+                Tool::all()
+                    .iter()
+                    .position(|t| *t == alt)
+                    .is_some_and(|j| present[j])
+            });
+
+            let needs_install = !present[i] && !alternative_present;
+
+            ToolStatus {
+                tool: *tool,
+                binary: tool.binary().to_string(),
+                present: present[i],
+                required: tool.required(),
+                enables: tool.enables().to_string(),
+                install_command: if needs_install {
+                    pm.install_command(&[pm.package_name(*tool)])
+                } else {
+                    None
+                },
+            }
+        })
+        .collect()
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -211,6 +327,7 @@ pub struct SystemReport {
     /// None means undetermined, not unsupported.
     pub polkit_supports_js_rules: Option<bool>,
     pub install_channel: InstallChannel,
+    pub tools: Vec<ToolStatus>,
     pub steps: Vec<SetupStep>,
 }
 
@@ -336,6 +453,8 @@ pub fn get_system_report() -> ApiResponse<SystemReport> {
         .map(|c| c.contains("fan_control=1"))
         .unwrap_or(false);
 
+    let tools = survey_tools(&package_manager, &|bin| command_exists(bin));
+
     let steps = build_setup_steps(
         &package_manager,
         polkit_supports_js_rules(polkit_parsed),
@@ -361,6 +480,7 @@ pub fn get_system_report() -> ApiResponse<SystemReport> {
             }),
             polkit_supports_js_rules: polkit_supports_js_rules(polkit_parsed),
             install_channel,
+            tools,
             steps,
         }),
         error: None,
@@ -523,6 +643,114 @@ mod tests {
             detect_install_channel("/usr/bin/thinkutils", Some(""), Some(""), false),
             InstallChannel::System
         );
+    }
+
+    // -- tool survey --
+
+    fn survey_with(pm: PackageManager, present: &[&str]) -> Vec<ToolStatus> {
+        let owned: Vec<String> = present.iter().map(|s| s.to_string()).collect();
+        survey_tools(&pm, &move |bin| owned.iter().any(|p| p == bin))
+    }
+
+    #[test]
+    fn reports_every_tool_the_app_shells_out_to() {
+        let statuses = survey_with(PackageManager::Apt, &[]);
+        let binaries: Vec<&str> = statuses.iter().map(|s| s.binary.as_str()).collect();
+        for expected in [
+            "pkexec",
+            "sensors",
+            "powerprofilesctl",
+            "tlp-stat",
+            "clamscan",
+        ] {
+            assert!(binaries.contains(&expected), "{} not surveyed", expected);
+        }
+    }
+
+    #[test]
+    fn present_tools_get_no_install_command() {
+        let statuses = survey_with(PackageManager::Apt, &["pkexec", "sensors"]);
+        for s in &statuses {
+            if s.binary == "pkexec" || s.binary == "sensors" {
+                assert!(s.present, "{} should be present", s.binary);
+                assert!(s.install_command.is_none(), "{} needs no install", s.binary);
+            }
+        }
+    }
+
+    #[test]
+    fn missing_tools_get_distro_correct_install_commands() {
+        let statuses = survey_with(PackageManager::Dnf, &[]);
+        let cmd = |bin: &str| {
+            statuses
+                .iter()
+                .find(|s| s.binary == bin)
+                .and_then(|s| s.install_command.clone())
+        };
+        assert_eq!(cmd("sensors"), Some("sudo dnf install lm_sensors".into()));
+        assert_eq!(cmd("pkexec"), Some("sudo dnf install polkit".into()));
+        assert_eq!(cmd("clamscan"), Some("sudo dnf install clamav".into()));
+    }
+
+    /// Only polkit is required; everything else gates one feature and the app is
+    /// still useful without it. Marking optional tools as required would push
+    /// users into installing things they do not need.
+    #[test]
+    fn only_polkit_is_required() {
+        let statuses = survey_with(PackageManager::Apt, &[]);
+        let required: Vec<&str> = statuses
+            .iter()
+            .filter(|s| s.required)
+            .map(|s| s.binary.as_str())
+            .collect();
+        assert_eq!(required, vec!["pkexec"]);
+    }
+
+    /// TLP and power-profiles-daemon do the same job and actively conflict when
+    /// both are installed. Having either must satisfy the other.
+    #[test]
+    fn tlp_and_power_profiles_satisfy_each_other() {
+        let with_ppd = survey_with(PackageManager::Apt, &["powerprofilesctl"]);
+        let tlp = with_ppd.iter().find(|s| s.binary == "tlp-stat").unwrap();
+        assert!(!tlp.present);
+        assert!(
+            tlp.install_command.is_none(),
+            "must not suggest tlp alongside power-profiles-daemon"
+        );
+
+        let with_tlp = survey_with(PackageManager::Apt, &["tlp-stat"]);
+        let ppd = with_tlp
+            .iter()
+            .find(|s| s.binary == "powerprofilesctl")
+            .unwrap();
+        assert!(
+            ppd.install_command.is_none(),
+            "must not suggest power-profiles-daemon alongside tlp"
+        );
+
+        // With neither, suggesting one is correct.
+        let with_none = survey_with(PackageManager::Apt, &[]);
+        let ppd = with_none
+            .iter()
+            .find(|s| s.binary == "powerprofilesctl")
+            .unwrap();
+        assert!(ppd.install_command.is_some());
+    }
+
+    #[test]
+    fn unknown_distro_yields_no_tool_commands() {
+        let statuses = survey_with(PackageManager::Unknown, &[]);
+        assert!(statuses.iter().all(|s| s.install_command.is_none()));
+        // But the tools are still listed, so the UI can name what is missing.
+        assert_eq!(statuses.len(), Tool::all().len());
+    }
+
+    #[test]
+    fn every_tool_explains_what_it_enables() {
+        for t in Tool::all() {
+            assert!(!t.enables().is_empty(), "{:?} has no explanation", t);
+            assert!(!t.binary().is_empty());
+        }
     }
 
     // -- setup steps --
