@@ -262,25 +262,7 @@ pub async fn enable_fan_control() -> ApiResponse<String> {
         MODPROBE_CONF_PATH
     );
 
-    let temp_script = match create_secure_temp_script(&script) {
-        Ok(p) => p,
-        Err(e) => {
-            return ApiResponse {
-                success: false,
-                data: None,
-                error: Some(e),
-            }
-        }
-    };
-
-    let result = tokio::process::Command::new("pkexec")
-        .arg("bash")
-        .arg(&temp_script)
-        .output()
-        .await;
-    let _ = fs::remove_file(&temp_script);
-
-    match result {
+    match crate::privileged::run_script(&script).await {
         Ok(output) if output.status.success() => {
             // Re-probe rather than assume the reload worked.
             let now_ready = crate::hardware_root::read_to_string(PROC_FAN)
@@ -324,44 +306,6 @@ pub struct ApiResponse<T> {
     pub success: bool,
     pub data: Option<T>,
     pub error: Option<String>,
-}
-
-/// Create a temp script securely (O_EXCL prevents symlink attacks, random name, restricted perms)
-#[cfg(unix)]
-pub fn create_secure_temp_script(content: &str) -> Result<String, String> {
-    use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
-
-    let random = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let path = format!("/tmp/thinkutils_{}.sh", random);
-
-    let mut file = fs::OpenOptions::new()
-        .create_new(true) // O_EXCL: fail if exists, don't follow symlinks
-        .write(true)
-        .mode(0o700) // Only owner can read/write/execute
-        .open(&path)
-        .map_err(|e| format!("Failed to create temp script: {}", e))?;
-
-    file.write_all(content.as_bytes()).map_err(|e| {
-        let _ = fs::remove_file(&path);
-        format!("Failed to write temp script: {}", e)
-    })?;
-
-    Ok(path)
-}
-
-#[cfg(not(unix))]
-pub fn create_secure_temp_script(content: &str) -> Result<String, String> {
-    let random = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let path = format!("/tmp/thinkutils_{}.sh", random);
-    fs::write(&path, content).map_err(|e| format!("Failed to create temp script: {}", e))?;
-    Ok(path)
 }
 
 #[tauri::command]
@@ -527,26 +471,8 @@ pub async fn set_fan_speed(speed: String) -> ApiResponse<String> {
         command_str, PROC_FAN
     );
 
-    let temp_script = match create_secure_temp_script(&script_content) {
-        Ok(path) => path,
-        Err(e) => {
-            return ApiResponse {
-                success: false,
-                data: None,
-                error: Some(e),
-            };
-        }
-    };
-
-    match tokio::process::Command::new("pkexec")
-        .arg("bash")
-        .arg(&temp_script)
-        .output()
-        .await
-    {
+    match crate::privileged::run_script(&script_content).await {
         Ok(output) => {
-            let _ = fs::remove_file(&temp_script);
-
             if output.status.success() {
                 println!("[Fan] ✓ Speed set via pkexec");
                 ApiResponse {
@@ -562,14 +488,11 @@ pub async fn set_fan_speed(speed: String) -> ApiResponse<String> {
                 }
             }
         }
-        Err(e) => {
-            let _ = fs::remove_file(&temp_script);
-            ApiResponse {
-                success: false,
-                data: None,
-                error: Some(format!("Failed to execute pkexec: {}", e)),
-            }
-        }
+        Err(e) => ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Failed to execute pkexec: {}", e)),
+        },
     }
 }
 

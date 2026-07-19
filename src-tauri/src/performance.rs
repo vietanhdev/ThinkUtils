@@ -128,7 +128,6 @@ pub async fn set_cpu_governor(governor: String) -> ApiResponse<String> {
     println!("[Performance] Found {} CPU cores", cpu_count);
 
     // Create script to set governor for all CPUs
-    let temp_script = format!("/tmp/set_governor_{}.sh", std::process::id());
     let mut script_content = String::from("#!/bin/bash\nset -e\n");
 
     for i in 0..cpu_count {
@@ -141,32 +140,10 @@ pub async fn set_cpu_governor(governor: String) -> ApiResponse<String> {
 
     println!("[Performance] Script content:\n{}", script_content);
 
-    if let Err(e) = fs::write(&temp_script, &script_content) {
-        return ApiResponse {
-            success: false,
-            data: None,
-            error: Some(format!("Failed to create script: {}", e)),
-        };
-    }
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::Permissions::from_mode(0o755);
-        let _ = fs::set_permissions(&temp_script, perms);
-    }
-
     println!("[Performance] Executing pkexec...");
 
-    match tokio::process::Command::new("pkexec")
-        .arg("bash")
-        .arg(&temp_script)
-        .output()
-        .await
-    {
+    match crate::privileged::run_script(&script_content).await {
         Ok(output) => {
-            let _ = fs::remove_file(&temp_script);
-
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
 
@@ -196,7 +173,6 @@ pub async fn set_cpu_governor(governor: String) -> ApiResponse<String> {
             }
         }
         Err(e) => {
-            let _ = fs::remove_file(&temp_script);
             println!("[Performance] Failed to execute pkexec: {}", e);
             ApiResponse {
                 success: false,
@@ -373,28 +349,13 @@ pub async fn set_turbo_boost(enabled: bool) -> ApiResponse<String> {
 
     // Try Intel P-state first
     if std::path::Path::new(intel_pstate).exists() {
-        let temp_script = format!("/tmp/set_turbo_{}.sh", std::process::id());
         let script_content = format!(
             "#!/bin/bash\nset -e\necho {} > {}\nexit 0\n",
             value, intel_pstate
         );
 
-        if fs::write(&temp_script, script_content).is_ok() {
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let perms = std::fs::Permissions::from_mode(0o755);
-                let _ = fs::set_permissions(&temp_script, perms);
-            }
-
-            if let Ok(output) = tokio::process::Command::new("pkexec")
-                .arg("bash")
-                .arg(&temp_script)
-                .output()
-                .await
-            {
-                let _ = fs::remove_file(&temp_script);
-
+        {
+            if let Ok(output) = crate::privileged::run_script(&script_content).await {
                 if output.status.success() {
                     return ApiResponse {
                         success: true,
@@ -411,28 +372,13 @@ pub async fn set_turbo_boost(enabled: bool) -> ApiResponse<String> {
 
     // Try cpufreq boost
     if std::path::Path::new(cpufreq_boost).exists() {
-        let temp_script = format!("/tmp/set_boost_{}.sh", std::process::id());
         let script_content = format!(
             "#!/bin/bash\nset -e\necho {} > {}\nexit 0\n",
             boost_value, cpufreq_boost
         );
 
-        if fs::write(&temp_script, script_content).is_ok() {
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let perms = std::fs::Permissions::from_mode(0o755);
-                let _ = fs::set_permissions(&temp_script, perms);
-            }
-
-            if let Ok(output) = tokio::process::Command::new("pkexec")
-                .arg("bash")
-                .arg(&temp_script)
-                .output()
-                .await
-            {
-                let _ = fs::remove_file(&temp_script);
-
+        {
+            if let Ok(output) = crate::privileged::run_script(&script_content).await {
                 if output.status.success() {
                     return ApiResponse {
                         success: true,

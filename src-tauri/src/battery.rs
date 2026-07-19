@@ -203,36 +203,13 @@ pub async fn set_battery_thresholds(start: u8, stop: u8) -> ApiResponse<String> 
     }
 
     // Need elevated permissions. Writes stay in the order chosen above.
-    let temp_script = format!("/tmp/battery_thresholds_{}.sh", std::process::id());
     let script_content = format!(
         "#!/bin/bash\nset -e\necho {} > {}\necho {} > {}\nexit 0\n",
         first_value, first_path, second_value, second_path
     );
 
-    if let Err(e) = fs::write(&temp_script, script_content) {
-        return ApiResponse {
-            success: false,
-            data: None,
-            error: Some(format!("Failed to create script: {}", e)),
-        };
-    }
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::Permissions::from_mode(0o755);
-        let _ = fs::set_permissions(&temp_script, perms);
-    }
-
-    match tokio::process::Command::new("pkexec")
-        .arg("bash")
-        .arg(&temp_script)
-        .output()
-        .await
-    {
+    match crate::privileged::run_script(&script_content).await {
         Ok(output) => {
-            let _ = fs::remove_file(&temp_script);
-
             if output.status.success() {
                 ApiResponse {
                     success: true,
@@ -247,14 +224,11 @@ pub async fn set_battery_thresholds(start: u8, stop: u8) -> ApiResponse<String> 
                 }
             }
         }
-        Err(e) => {
-            let _ = fs::remove_file(&temp_script);
-            ApiResponse {
-                success: false,
-                data: None,
-                error: Some(format!("Failed to execute: {}", e)),
-            }
-        }
+        Err(e) => ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Failed to execute: {}", e)),
+        },
     }
 }
 
