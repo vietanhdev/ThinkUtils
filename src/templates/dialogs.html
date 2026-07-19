@@ -189,14 +189,16 @@
           You'll be prompted for your password once. After setup, no password will be required.
         </p>
       </div>
+    </div>
 
-      <div
-        class="dialog-footer"
-        style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px"
-      >
-        <button id="skip-permissions" class="dialog-button-secondary">Skip for Now</button>
-        <button id="setup-permissions" class="dialog-button-primary">Setup Permissions</button>
-      </div>
+    <!-- Outside .dialog-content deliberately. That element scrolls
+         (max-height: calc(90vh - 180px)), so a footer inside it scrolled the
+         primary action out of view -- at the app's own 700px minimum window
+         height the Setup button was below the fold with nothing indicating it
+         was there. -->
+    <div class="dialog-actions">
+      <button id="skip-permissions" class="dialog-button-secondary">Skip for Now</button>
+      <button id="setup-permissions" class="dialog-button-primary">Setup Permissions</button>
     </div>
   </div>
 </div>

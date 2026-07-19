@@ -253,3 +253,51 @@ fn debian_control_is_templated_for_per_series_rust() {
         );
     }
 }
+
+/// The permission dialog's action row must live OUTSIDE the scrolling body.
+///
+/// `.dialog-content` scrolls, and while the buttons were inside it the primary
+/// action sat below the fold at the app's own 700px minimum window height, with
+/// nothing indicating it was there. A first-run user could not find "Setup
+/// Permissions" without discovering they had to scroll a dialog.
+#[test]
+fn dialog_actions_are_not_inside_the_scrolling_body() {
+    let html = read("src/templates/dialogs.html");
+
+    let actions = html
+        .find(r#"class="dialog-actions""#)
+        .expect("permission dialog has an action row");
+    let content_close = html[..actions]
+        .rfind("</div>")
+        .expect("something closes before the actions");
+
+    // The action row must come after .dialog-content closes. Comparing indices
+    // is enough because the row is the last element in the container.
+    assert!(
+        content_close < actions,
+        "the action row must follow the scrolling content, not sit inside it"
+    );
+
+    assert!(
+        html.contains(r#"id="setup-permissions""#),
+        "the primary action must still exist"
+    );
+}
+
+/// The pinned row only stays pinned if the container is a flex column. As a
+/// plain block, the row is pushed past max-height rather than held in view --
+/// which looks identical in a wide window and breaks in a short one.
+#[test]
+fn the_dialog_container_is_a_flex_column() {
+    let css = read("src/styles/dialogs.css");
+    let start = css
+        .find(".dialog-container {")
+        .expect(".dialog-container is styled");
+    let block = &css[start..start + css[start..].find('}').expect("rule closes")];
+
+    assert!(block.contains("display: flex"), "container must be flex");
+    assert!(
+        block.contains("flex-direction: column"),
+        "container must stack header, content and actions vertically"
+    );
+}
