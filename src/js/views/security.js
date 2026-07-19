@@ -1,3 +1,4 @@
+import { escapeHtml } from '../utils.js';
 // Security View - Antivirus and Security Settings
 const { invoke } = window.__TAURI__.core;
 
@@ -363,12 +364,6 @@ function showNotification(message, type = 'info') {
       notification.remove();
     }, 3000);
   }
-}
-
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
 }
 
 function showScanLogs(scanType) {

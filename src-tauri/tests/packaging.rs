@@ -159,3 +159,65 @@ fn packaging_versions_match_the_manifest() {
         version
     );
 }
+
+/// The app enables `withGlobalTauri`, so any injected script reaches the full
+/// `__TAURI__` API -- including commands that end in `pkexec`. A null CSP made
+/// an XSS in a view (process names from `ps aux` are rendered) into a path to
+/// root. Both halves are fixed; this guards the CSP half.
+#[test]
+fn csp_is_set_and_restrictive() {
+    let conf = read("src-tauri/tauri.conf.json");
+    let parsed: serde_json::Value = serde_json::from_str(&conf).expect("tauri.conf.json parses");
+    let csp = parsed["app"]["security"]["csp"]
+        .as_str()
+        .expect("csp must be a string, not null");
+
+    for required in [
+        "default-src 'self'",
+        "script-src 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'none'",
+    ] {
+        assert!(csp.contains(required), "CSP is missing {}", required);
+    }
+
+    // 'unsafe-inline' on script-src would defeat the entire point; templates do
+    // use inline style attributes, so style-src legitimately needs it.
+    let script_src = csp
+        .split(';')
+        .find(|d| d.trim().starts_with("script-src"))
+        .expect("script-src directive present");
+    assert!(
+        !script_src.contains("unsafe-inline") && !script_src.contains("unsafe-eval"),
+        "script-src must not allow unsafe-inline or unsafe-eval: {}",
+        script_src
+    );
+}
+
+/// escapeHtml lived privately in security.js, so every other view rendering
+/// untrusted strings had no escaping at all. It belongs in utils.js, and the
+/// views that render process names, mount points and device labels must use it.
+#[test]
+fn views_escape_untrusted_strings() {
+    assert!(
+        read("src/js/utils.js").contains("export function escapeHtml"),
+        "escapeHtml must be shared from utils.js, not private to one view"
+    );
+
+    for view in ["monitor", "battery", "fan", "security"] {
+        let src = read(&format!("src/js/views/{}.js", view));
+        assert!(
+            src.contains("escapeHtml"),
+            "{}.js renders external strings but does not escape them",
+            view
+        );
+    }
+
+    // The specific reachable case: `ps aux` output is attacker-controllable by
+    // any local user, who can name a binary `<img src=x onerror=...>`.
+    let monitor = read("src/js/views/monitor.js");
+    assert!(
+        monitor.contains("escapeHtml(proc.name)"),
+        "process names from `ps aux` must be escaped"
+    );
+}

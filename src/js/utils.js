@@ -43,3 +43,21 @@ export function showStatus(message, type = 'info') {
     }
   }, timeout);
 }
+
+/**
+ * Escape text for safe interpolation into innerHTML.
+ *
+ * Several views render strings that originate outside the app — process names
+ * from `ps aux`, mount points, network interface names, ClamAV threat names.
+ * Any local user can create a process named `<img src=x onerror=...>`, and with
+ * `withGlobalTauri` enabled that script would reach the full `__TAURI__` API.
+ *
+ * Lives here rather than in one view because it was previously private to
+ * security.js, so every other view rendering untrusted strings had no escaping
+ * at all.
+ */
+export function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text ?? '';
+  return div.innerHTML;
+}
