@@ -28,7 +28,7 @@ Start the MCP server from the app's MCP page, then configure your AI tool:
 ### Claude Code
 
 ```bash
-claude mcp add --transport sse thinkutils http://127.0.0.1:8765/sse
+claude mcp add --transport http thinkutils http://127.0.0.1:8765/sse
 ```
 
 Or add to `.mcp.json` in your project:

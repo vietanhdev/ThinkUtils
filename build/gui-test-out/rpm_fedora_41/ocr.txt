@@ -1,0 +1,26 @@
+Permissions Required
+One-time setup
+ThinkUtils needs permission to access system files for
+controlling your laptop's hardware. This is a one-time setup
+that will allow the app to manage CPU, fan, and battery
+settings.
+WHAT WILL BE CONFIGURED:
+y CPU frequency and governor control
+vy Fan speed control
+Y Battery charge thresholds
+Y Turbo boost settings
+You'll be prompted for your password once. After setup, no password
+will be required.
+Permissions Required
+One-time setup
+ThinkUtils needs permission to access system files for
+controlling your laptop's hardware. This is a one-time setup
+that will allow the app to manage CPU, fan, and battery
+settings.
+WHAT WILL BE CONFIGURED:
+CPU frequency and governor control
+v Fan speed control
+v Battery charge thresholds
+Y Turbo boost settings
+You'll be prompted for your password once. After setup, no password
+will be required.

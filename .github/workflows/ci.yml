@@ -129,19 +129,11 @@ jobs:
         working-directory: src-tauri
         run: |
           cargo audit \
-            --ignore RUSTSEC-2026-0189 \
             --ignore RUSTSEC-2026-0099 \
             --ignore RUSTSEC-2026-0098 \
             --ignore RUSTSEC-2026-0104
 
-      # RUSTSEC-2026-0189 (rmcp 0.1.5, DNS rebinding, CVSS 8.8)
-      #   Covers rmcp's Streamable HTTP server transport. This app enables only
-      #   transport-sse-server, so cargo audit is matching on version rather than
-      #   on a reachable code path. The underlying weakness -- no Host or Origin
-      #   validation -- is real and lives in our code, and is partially mitigated
-      #   already: validate_mcp_host now refuses anything but loopback. Closing it
-      #   fully needs rmcp >= 1.4's allowed_hosts/allowed_origins, because 0.1.5
-      #   exposes no seam to add them.
+      # RUSTSEC-2026-0189 (rmcp) is NO LONGER IGNORED -- rmcp 2.x cleared it.
       #
       # RUSTSEC-2026-0099 / -0098 / -0104 (rustls-webpki 0.101.7)
       #   Transitive: rustls-webpki <- rustls 0.21 <- reqwest 0.11 <- oauth2 4.4.
@@ -151,7 +143,7 @@ jobs:
         run: |
           set -euo pipefail
           # Guards against an ignore being added without a reason next to it.
-          for id in RUSTSEC-2026-0189 RUSTSEC-2026-0099 RUSTSEC-2026-0098 RUSTSEC-2026-0104; do
+          for id in RUSTSEC-2026-0099 RUSTSEC-2026-0098 RUSTSEC-2026-0104; do
             grep -q "$id" .github/workflows/ci.yml || {
               echo "::error::$id is ignored but has no documented justification"; exit 1; }
           done
