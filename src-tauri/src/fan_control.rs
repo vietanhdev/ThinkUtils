@@ -141,11 +141,11 @@ pub struct FanCapability {
 
 #[tauri::command]
 pub fn get_fan_capability() -> ApiResponse<FanCapability> {
-    let modprobe_conf_present = fs::read_to_string(MODPROBE_CONF_PATH)
+    let modprobe_conf_present = crate::hardware_root::read_to_string(MODPROBE_CONF_PATH)
         .map(|c| c.contains("fan_control=1"))
         .unwrap_or(false);
 
-    let (readiness, message) = match fs::read_to_string(PROC_FAN) {
+    let (readiness, message) = match crate::hardware_root::read_to_string(PROC_FAN) {
         Err(_) => (
             FanReadiness::NoThinkpadFan,
             "No ThinkPad fan interface found. Load the thinkpad_acpi module, or this model may not be supported.".to_string(),
@@ -206,7 +206,7 @@ pub async fn enable_fan_control() -> ApiResponse<String> {
     match result {
         Ok(output) if output.status.success() => {
             // Re-probe rather than assume the reload worked.
-            let now_ready = fs::read_to_string(PROC_FAN)
+            let now_ready = crate::hardware_root::read_to_string(PROC_FAN)
                 .map(|c| fan_control_is_enabled(&c))
                 .unwrap_or(false);
 
@@ -293,7 +293,7 @@ pub fn get_sensor_data() -> ApiResponse<SensorData> {
     let mut fans = HashMap::new();
 
     // Get fan info from /proc/acpi/ibm/fan
-    match fs::read_to_string(PROC_FAN) {
+    match crate::hardware_root::read_to_string(PROC_FAN) {
         Ok(content) => {
             fans.extend(parse_fan_proc(&content));
         }
@@ -368,13 +368,26 @@ pub async fn set_fan_speed(speed: String) -> ApiResponse<String> {
         };
     }
 
+    // Reads may come from a captured hardware profile; writes never may. A test
+    // must not be able to believe it changed a real fan.
+    if crate::hardware_root::is_simulated() {
+        return ApiResponse {
+            success: false,
+            data: None,
+            error: Some(
+                "Running against a simulated hardware profile. Fan changes are disabled."
+                    .to_string(),
+            ),
+        };
+    }
+
     println!("[Fan] Setting speed to: {}", speed);
     let command_str = format!("level {}", speed);
 
     // Check the module parameter before trying anything. If fan_control=1 is
     // missing the kernel returns -EPERM no matter who we are, and telling the
     // user to grant permissions sends them somewhere that cannot help.
-    if let Ok(content) = fs::read_to_string(PROC_FAN) {
+    if let Ok(content) = crate::hardware_root::read_to_string(PROC_FAN) {
         if !fan_control_is_enabled(&content) {
             return ApiResponse {
                 success: false,

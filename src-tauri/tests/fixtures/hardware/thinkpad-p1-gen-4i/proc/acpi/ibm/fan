@@ -1,0 +1,6 @@
+status:		enabled
+speed:		2420
+level:		auto
+commands:	level <level> (<level> is 0-7, auto, disengaged, full-speed)
+commands:	enable, disable
+commands:	watchdog <timeout> (<timeout> is 0 (off), 1-120 (seconds))

@@ -1,0 +1,9 @@
+/sys/class/hwmon/hwmon0 -> /sys/devices/pci0000:00/0000:00:1f.0/PNP0C09:00/ACPI0003:00/power_supply/AC/hwmon0
+/sys/class/hwmon/hwmon1 -> /sys/devices/virtual/thermal/thermal_zone0/hwmon1
+/sys/class/hwmon/hwmon2 -> /sys/devices/LNXSYSTM:00/LNXSYBUS:00/PNP0A08:00/device:1e/PNP0C09:00/PNP0C0A:00/power_supply/BAT0/hwmon2
+/sys/class/hwmon/hwmon3 -> /sys/devices/pci0000:00/0000:00:06.0/0000:04:00.0/nvme/nvme0/hwmon3
+/sys/class/hwmon/hwmon4 -> /sys/devices/platform/USBC000:00/power_supply/ucsi-source-psy-USBC000:001/hwmon4
+/sys/class/hwmon/hwmon5 -> /sys/devices/platform/USBC000:00/power_supply/ucsi-source-psy-USBC000:002/hwmon5
+/sys/class/hwmon/hwmon6 -> /sys/devices/platform/thinkpad_hwmon/hwmon/hwmon6
+/sys/class/hwmon/hwmon7 -> /sys/devices/virtual/thermal/thermal_zone9/hwmon7
+/sys/class/hwmon/hwmon8 -> /sys/devices/platform/coretemp.0/hwmon/hwmon8
