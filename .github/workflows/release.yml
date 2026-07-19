@@ -4,11 +4,28 @@ on:
   push:
     tags:
       - 'v*'
-    branches:
-      - main
+  # Rehearse the whole pipeline without burning a version number. Replaces the
+  # old push-to-main trigger, which built a release on every merge; ci.yml now
+  # covers main.
+  workflow_dispatch:
 
 jobs:
+  # Cut a tag and you run the exact CI pipeline, not a copy of it that can drift.
+  # Until now a broken commit tagged vX.Y.Z shipped automatically -- the tests
+  # existed and had never once gated a release.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   build-and-release:
+    needs: ci
+    # Deliberately NOT bumped to ubuntu-24.04 despite 22.04's deprecation.
+    # Tauri's deb bundler reads the glibc floor off the BUILD HOST, so building
+    # on 24.04 (glibc 2.39) emits a package declaring libc6 (>= 2.39), which apt
+    # then refuses to install on Ubuntu 22.04 (2.35) and Debian 12 (2.36).
+    # Nothing about that is visible at build time -- it surfaces as a broken
+    # download for users. The correct fix is runs-on: ubuntu-24.04 with
+    # container: ubuntu:22.04, so the floor is ours to pin rather than GitHub's
+    # to deprecate. Tracked separately; do not "just bump the runner".
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -55,12 +72,52 @@ jobs:
 
       - name: Rename packages
         run: |
-          cd src-tauri/target/release/bundle/deb
+          set -euo pipefail
+          V="${{ steps.version.outputs.version }}"
+          B=src-tauri/target/release/bundle
+
+          cd "$B/deb"
           DEB_FILE=$(ls *.deb | head -n 1)
-          mv "$DEB_FILE" "thinkutils_${{ steps.version.outputs.version }}_amd64.deb"
+          mv "$DEB_FILE" "thinkutils_${V}_amd64.deb"
+
           cd ../rpm
           RPM_FILE=$(ls *.rpm | head -n 1)
-          mv "$RPM_FILE" "thinkutils-${{ steps.version.outputs.version }}.x86_64.rpm"
+          mv "$RPM_FILE" "thinkutils-${V}.x86_64.rpm"
+
+          # The AppImage was uploaded under whatever Tauri defaulted to while the
+          # deb and rpm carried clean versioned names, so releases shipped one
+          # asset named inconsistently with the other two.
+          cd ../appimage
+          APPIMAGE_FILE=$(ls *.AppImage | head -n 1)
+          mv "$APPIMAGE_FILE" "thinkutils_${V}_amd64.AppImage"
+
+      # cargo tauri build exiting 0 only proves the metadata parsed. These assert
+      # the package CONTAINS what it promises, before it is published.
+      - name: Verify package contents
+        run: |
+          set -euo pipefail
+          V="${{ steps.version.outputs.version }}"
+          deb="src-tauri/target/release/bundle/deb/thinkutils_${V}_amd64.deb"
+
+          dpkg-deb --contents "$deb" | grep -q 'usr/bin/thinkutils' \
+            || { echo "::error::.deb does not ship /usr/bin/thinkutils"; exit 1; }
+
+          dpkg-deb --contents "$deb" | grep -q 'applications/.*\.desktop' \
+            || { echo "::error::.deb ships no .desktop entry - the app would not appear in any launcher"; exit 1; }
+
+          got=$(file -b src-tauri/target/release/thinkutils)
+          case "$got" in
+            *x86-64*) ;;
+            *) echo "::error::built binary is '$got', not x86-64"; exit 1 ;;
+          esac
+
+          # Tauri's dependency auto-detection is incomplete, so apt resolving the
+          # Depends line does not prove the binary can start. ldd is what proves it.
+          if ldd src-tauri/target/release/thinkutils | grep "not found"; then
+            echo "::error::binary has unresolved shared libraries"
+            exit 1
+          fi
+          echo "OK: package ships the binary, a desktop entry, and resolves every library"
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -79,8 +136,24 @@ jobs:
       - name: Update APT repository
         if: startsWith(github.ref, 'refs/tags/')
         run: |
+          # This step publishes to a live APT repo that users have in their
+          # sources.list. A half-finished run takes that repo down, so it fails
+          # fast rather than pressing on.
+          set -euo pipefail
+
           # Install dpkg-scanpackages
           sudo apt-get install -y dpkg-dev
+
+          # Verify the .deb exists BEFORE touching the published repo. The old
+          # order deleted the existing package first and copied second, so a glob
+          # that matched nothing left an empty apt/ -- which then got committed,
+          # taking the repository offline for everyone installing via apt.
+          deb_count=$(ls -1 src-tauri/target/release/bundle/deb/*.deb 2>/dev/null | wc -l) || true
+          if [ "${deb_count:-0}" -eq 0 ]; then
+            echo "::error::no .deb was built - refusing to touch the published APT repository"
+            exit 1
+          fi
+          echo "found ${deb_count} .deb to publish"
 
           # Clone or create gh-pages branch
           git fetch origin gh-pages:gh-pages 2>/dev/null || true
@@ -95,9 +168,22 @@ jobs:
           # Set up apt directory
           mkdir -p gh-pages-dir/apt
 
-          # Copy the new .deb (keep only the latest version)
+          # Stage into a fresh directory and swap it in, so the published apt/ is
+          # never in a half-updated state on disk.
+          rm -rf gh-pages-dir/apt.new
+          mkdir -p gh-pages-dir/apt.new
+          cp src-tauri/target/release/bundle/deb/*.deb gh-pages-dir/apt.new/
+
+          staged=$(ls -1 gh-pages-dir/apt.new/*.deb 2>/dev/null | wc -l) || true
+          if [ "${staged:-0}" -eq 0 ]; then
+            echo "::error::staging directory is empty after copy - aborting before publish"
+            rm -rf gh-pages-dir/apt.new
+            exit 1
+          fi
+
           rm -f gh-pages-dir/apt/*.deb
-          cp src-tauri/target/release/bundle/deb/*.deb gh-pages-dir/apt/
+          mv gh-pages-dir/apt.new/*.deb gh-pages-dir/apt/
+          rmdir gh-pages-dir/apt.new
 
           # Generate APT repo metadata
           cd gh-pages-dir/apt
