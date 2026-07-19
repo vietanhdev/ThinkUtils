@@ -30,9 +30,17 @@ fn validate_battery_thresholds(start: u32, stop: u32) -> Option<String> {
     }
 }
 
+/// Loopback only. `0.0.0.0` is deliberately rejected: this server exposes fan and
+/// battery control with no authentication, so binding it to a routable interface
+/// hands hardware control to anyone on the network.
+///
+/// Note this does NOT close the DNS-rebinding / cross-origin CSRF vector against
+/// loopback — a malicious page can still POST to 127.0.0.1 from the user's browser.
+/// Closing that needs Host+Origin allowlisting, which rmcp 0.1.5 gives us no seam
+/// to add (SseServer::serve_with_config builds its router internally). See task #1.
 fn validate_mcp_host(host: &str) -> Option<String> {
-    if host != "127.0.0.1" && host != "0.0.0.0" && host != "localhost" {
-        Some("Host must be 127.0.0.1, 0.0.0.0, or localhost".into())
+    if host != "127.0.0.1" && host != "localhost" {
+        Some("Host must be 127.0.0.1 or localhost. Binding to other interfaces is not allowed: the MCP server is unauthenticated.".into())
     } else {
         None
     }
@@ -402,7 +410,6 @@ mod tests {
     #[test]
     fn valid_mcp_hosts() {
         assert!(validate_mcp_host("127.0.0.1").is_none());
-        assert!(validate_mcp_host("0.0.0.0").is_none());
         assert!(validate_mcp_host("localhost").is_none());
     }
 
@@ -411,6 +418,14 @@ mod tests {
         for host in &["192.168.1.1", "10.0.0.1", "example.com", ""] {
             assert!(validate_mcp_host(host).is_some(), "expected '{}' to be rejected", host);
         }
+    }
+
+    /// The MCP server is unauthenticated and exposes fan/battery control, so it
+    /// must never be bindable to a routable interface. Regression guard.
+    #[test]
+    fn wildcard_bind_is_rejected() {
+        assert!(validate_mcp_host("0.0.0.0").is_some());
+        assert!(validate_mcp_host("::").is_some());
     }
 
     // -- Bind host resolution --
