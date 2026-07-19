@@ -11,9 +11,12 @@ use oauth2::reqwest::async_http_client;
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 
-// Google OAuth credentials - Users need to create their own at https://console.cloud.google.com
-const GOOGLE_CLIENT_ID: &str = "787652804555-akmgh2mr0kdif7hafo43rhnso0q1ds4f.apps.googleusercontent.com";
-const GOOGLE_CLIENT_SECRET: &str = "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";
+// Google OAuth credentials, supplied at build time. Never hardcode these:
+// a desktop binary cannot keep a secret, so anything embedded here is public.
+// Set THINKUTILS_GOOGLE_CLIENT_ID / _SECRET when building to enable sync.
+// Create credentials at https://console.cloud.google.com (APIs & Services > Credentials).
+const GOOGLE_CLIENT_ID: Option<&str> = option_env!("THINKUTILS_GOOGLE_CLIENT_ID");
+const GOOGLE_CLIENT_SECRET: Option<&str> = option_env!("THINKUTILS_GOOGLE_CLIENT_SECRET");
 const REDIRECT_URI: &str = "http://localhost:8765/callback";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -137,15 +140,54 @@ fn save_sync_state(state: &SyncState) -> Result<(), String> {
     let content = serde_json::to_string_pretty(state)
         .map_err(|e| format!("Failed to serialize sync state: {}", e))?;
     
-    fs::write(&path, content)
-        .map_err(|e| format!("Failed to write sync state: {}", e))?;
-    
+    write_private(&path, &content)
+}
+
+/// Write a file readable only by its owner.
+///
+/// The sync state holds OAuth access and refresh tokens, so it must never be
+/// left at the default umask where other local users can read it.
+fn write_private(path: &std::path::Path, content: &str) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        use std::io::Write;
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(path)
+            .map_err(|e| format!("Failed to write sync state: {}", e))?;
+        file.write_all(content.as_bytes())
+            .map_err(|e| format!("Failed to write sync state: {}", e))?;
+
+        // .mode() only applies when the file is created, so a file that already
+        // existed at 0644 would keep those bits. Tighten it explicitly.
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+            .map_err(|e| format!("Failed to secure sync state: {}", e))?;
+    }
+
+    #[cfg(not(unix))]
+    fs::write(path, content).map_err(|e| format!("Failed to write sync state: {}", e))?;
+
     Ok(())
 }
 
 fn create_oauth_client() -> Result<BasicClient, String> {
-    let client_id = ClientId::new(GOOGLE_CLIENT_ID.to_string());
-    let client_secret = ClientSecret::new(GOOGLE_CLIENT_SECRET.to_string());
+    let client_id = ClientId::new(
+        GOOGLE_CLIENT_ID
+            .filter(|s| !s.is_empty())
+            .ok_or("Google sync is not configured in this build (THINKUTILS_GOOGLE_CLIENT_ID unset).")?
+            .to_string(),
+    );
+    let client_secret = ClientSecret::new(
+        GOOGLE_CLIENT_SECRET
+            .filter(|s| !s.is_empty())
+            .ok_or("Google sync is not configured in this build (THINKUTILS_GOOGLE_CLIENT_SECRET unset).")?
+            .to_string(),
+    );
     let auth_url = AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
         .map_err(|e| format!("Invalid auth URL: {}", e))?;
     let token_url = TokenUrl::new("https://oauth2.googleapis.com/token".to_string())
@@ -577,5 +619,57 @@ pub fn save_settings(settings: UserSettings) -> ApiResponse<String> {
             data: None,
             error: Some(format!("Failed to load current state: {}", e)),
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Unique temp path per call; std has no tempdir and we don't want a dev-dependency
+    /// for two tests.
+    fn temp_path(tag: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        std::env::temp_dir().join(format!("thinkutils_test_{}_{}_{}", tag, std::process::id(), nanos))
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn write_private_creates_owner_only_file() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = temp_path("create");
+        write_private(&path, "{\"token\":\"secret\"}").expect("write should succeed");
+
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "expected 0600, got {:o}", mode);
+        assert_eq!(fs::read_to_string(&path).unwrap(), "{\"token\":\"secret\"}");
+
+        let _ = fs::remove_file(&path);
+    }
+
+    /// The regression this guards: OpenOptions::mode() only applies at creation, so a
+    /// sync_state.json already on disk at 0644 (as shipped before this fix) would keep
+    /// its world-readable bits and continue leaking tokens.
+    #[cfg(unix)]
+    #[test]
+    fn write_private_tightens_existing_world_readable_file() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = temp_path("tighten");
+        fs::write(&path, "old").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+        assert_eq!(fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o644);
+
+        write_private(&path, "new").expect("write should succeed");
+
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "pre-existing file was not tightened; got {:o}", mode);
+        assert_eq!(fs::read_to_string(&path).unwrap(), "new");
+
+        let _ = fs::remove_file(&path);
     }
 }

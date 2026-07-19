@@ -139,6 +139,20 @@ pub fn get_battery_thresholds() -> ApiResponse<BatteryThresholds> {
     }
 }
 
+/// Whether the new start threshold must be written before the new stop threshold.
+///
+/// The firmware rejects any write that would leave start >= stop, even
+/// transiently, so the order depends on where the new stop lands relative to the
+/// start already on the hardware.
+///
+/// Writing stop first leaves the intermediate state (current_start, new_stop).
+/// That is only safe while current_start < new_stop. The boundary case matters:
+/// at new_stop == current_start the intermediate state is (X, X), which is
+/// start == stop and is rejected — hence >=, not >.
+fn write_start_first(current_start: u8, new_stop: u8) -> bool {
+    new_stop <= current_start
+}
+
 #[tauri::command]
 pub async fn set_battery_thresholds(start: u8, stop: u8) -> ApiResponse<String> {
     if start >= stop {
@@ -160,9 +174,27 @@ pub async fn set_battery_thresholds(start: u8, stop: u8) -> ApiResponse<String> 
     let start_path = format!("{}/charge_control_start_threshold", BAT0_PATH);
     let stop_path = format!("{}/charge_control_end_threshold", BAT0_PATH);
 
+    // get_battery_thresholds() has no failure path — it substitutes defaults on a
+    // failed read — so there is nothing to match on. Note the substituted default
+    // for start is 0, which makes write_start_first() return false and yields the
+    // stop-first order. That is the safe fallback: it is the order that was in use
+    // before this ordering logic existed.
+    let current = get_battery_thresholds().data.unwrap_or(BatteryThresholds {
+        start: 0,
+        stop: 100,
+    });
+
+    let (first_path, first_value, second_path, second_value) =
+        if write_start_first(current.start, stop) {
+            (start_path, start.to_string(), stop_path, stop.to_string())
+        } else {
+            (stop_path, stop.to_string(), start_path, start.to_string())
+        };
+
     // Try direct write first
-    if fs::write(&start_path, start.to_string()).is_ok()
-        && fs::write(&stop_path, stop.to_string()).is_ok() {
+    if fs::write(&first_path, &first_value).is_ok()
+        && fs::write(&second_path, &second_value).is_ok()
+    {
         return ApiResponse {
             success: true,
             data: Some(format!("Thresholds set: {}%-{}%", start, stop)),
@@ -170,11 +202,11 @@ pub async fn set_battery_thresholds(start: u8, stop: u8) -> ApiResponse<String> 
         };
     }
 
-    // Need elevated permissions
+    // Need elevated permissions. Writes stay in the order chosen above.
     let temp_script = format!("/tmp/battery_thresholds_{}.sh", std::process::id());
     let script_content = format!(
         "#!/bin/bash\nset -e\necho {} > {}\necho {} > {}\nexit 0\n",
-        start, start_path, stop, stop_path
+        first_value, first_path, second_value, second_path
     );
 
     if let Err(e) = fs::write(&temp_script, script_content) {
@@ -240,5 +272,82 @@ pub fn get_power_consumption() -> ApiResponse<f32> {
         success: true,
         data: Some(power),
         error: None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Model the firmware constraint: a write is rejected if it would leave
+    /// start >= stop, even for an instant. Replays the two writes in the chosen
+    /// order and reports whether every intermediate state stayed legal.
+    fn ordering_is_safe(current: (u8, u8), target: (u8, u8)) -> bool {
+        let (cur_start, cur_stop) = current;
+        let (new_start, new_stop) = target;
+
+        let states = if write_start_first(cur_start, new_stop) {
+            // write start, then stop
+            [(new_start, cur_stop), (new_start, new_stop)]
+        } else {
+            // write stop, then start
+            [(cur_start, new_stop), (new_start, new_stop)]
+        };
+
+        states.iter().all(|(s, e)| s < e)
+    }
+
+    /// The case the original ordering logic missed. With `new_stop < current_start`
+    /// this picks stop-first, producing the intermediate state (60, 60) — start
+    /// equal to stop, which the firmware rejects with the same "Invalid argument"
+    /// the ordering was introduced to prevent.
+    #[test]
+    fn boundary_new_stop_equals_current_start() {
+        assert!(
+            write_start_first(60, 60),
+            "new_stop == current_start must write start first"
+        );
+        assert!(ordering_is_safe((60, 80), (40, 60)));
+    }
+
+    #[test]
+    fn lowering_thresholds_writes_start_first() {
+        assert!(write_start_first(60, 50));
+        assert!(ordering_is_safe((60, 80), (30, 50)));
+    }
+
+    #[test]
+    fn raising_thresholds_writes_stop_first() {
+        assert!(!write_start_first(40, 90));
+        assert!(ordering_is_safe((40, 60), (70, 90)));
+    }
+
+    /// Exhaustive sweep over every legal current/target pair. Any ordering rule
+    /// that admits an illegal intermediate state fails here.
+    #[test]
+    fn no_transition_passes_through_an_illegal_state() {
+        for cur_start in 0..=100u8 {
+            for cur_stop in (cur_start + 1)..=100u8 {
+                for new_start in 0..=100u8 {
+                    for new_stop in (new_start + 1)..=100u8 {
+                        assert!(
+                            ordering_is_safe((cur_start, cur_stop), (new_start, new_stop)),
+                            "illegal intermediate state going from ({}, {}) to ({}, {})",
+                            cur_start,
+                            cur_stop,
+                            new_start,
+                            new_stop
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// A failed sysfs read substitutes start = 0, which must fall back to the
+    /// stop-first order that predates this logic rather than doing something novel.
+    #[test]
+    fn unreadable_current_start_falls_back_to_stop_first() {
+        assert!(!write_start_first(0, 80));
     }
 }

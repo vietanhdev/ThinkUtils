@@ -16,29 +16,38 @@ else
     exit 1
 fi
 
+# Install dedicated fan control helper (validates commands before applying)
+echo "Installing fan control helper..."
+sudo tee /usr/local/bin/thinkutils-fan-control > /dev/null << 'EOF'
+#!/bin/bash
+set -e
+FAN="/proc/acpi/ibm/fan"
+case "$1" in
+    "level auto"|"level full-speed"|"level 0"|"level 1"|"level 2"|"level 3"|"level 4"|"level 5"|"level 6"|"level 7")
+        echo "$1" > "$FAN"
+        ;;
+    *)
+        echo "Invalid command" >&2
+        exit 1
+        ;;
+esac
+EOF
+sudo chmod 755 /usr/local/bin/thinkutils-fan-control
+echo "✓ Helper installed at /usr/local/bin/thinkutils-fan-control"
+
 # Create polkit rules directory if it doesn't exist
 sudo mkdir -p /etc/polkit-1/rules.d
 
-# Create the rule file
+# Create the rule file (only allows the dedicated helper, not arbitrary bash)
 echo "Creating polkit rule..."
 sudo tee /etc/polkit-1/rules.d/50-thinkutils.rules > /dev/null << 'EOF'
-/* Allow users in wheel/sudo group to run ThinkUtils without password */
+/* ThinkUtils: Allow passwordless fan control via dedicated helper only */
 polkit.addRule(function(action, subject) {
     if (action.id == "org.freedesktop.policykit.exec") {
         var program = action.lookup("program");
-
-        // Allow bash execution for ThinkUtils operations
-        if (program == "/bin/bash" || program == "/usr/bin/bash") {
+        if (program == "/usr/local/bin/thinkutils-fan-control") {
             if (subject.isInGroup("wheel") || subject.isInGroup("sudo")) {
-                polkit.log("ThinkUtils: Allowing passwordless access for " + subject.user);
-                return polkit.Result.YES;
-            }
-        }
-
-        // Allow chmod and chown for fan control
-        if (program == "/bin/chmod" || program == "/usr/bin/chmod" ||
-            program == "/bin/chown" || program == "/usr/bin/chown") {
-            if (subject.isInGroup("wheel") || subject.isInGroup("sudo")) {
+                polkit.log("ThinkUtils: Allowing passwordless fan control for " + subject.user);
                 return polkit.Result.YES;
             }
         }
@@ -54,5 +63,5 @@ sudo systemctl reload polkit 2>/dev/null || sudo killall -HUP polkitd 2>/dev/nul
 echo ""
 echo "✓ Setup complete!"
 echo ""
-echo "ThinkUtils will now run without asking for a password."
+echo "ThinkUtils fan control will now work without asking for a password."
 echo "Restart the app to test."

@@ -23,3 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 /target/
+
+# VitePress
+docs/.vitepress/dist
+docs/.vitepress/cache

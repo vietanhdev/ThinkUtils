@@ -17,15 +17,22 @@ import { isModularMode, loadTemplates, injectTemplates } from './templateLoader.
 async function checkAndSetupPermissions() {
   console.log('[Permissions] Checking permission status...');
   try {
+    // If the fan helper + polkit rule are already installed (from a previous setup),
+    // skip the startup dialog. Sysfs permissions reset on reboot but the polkit rule
+    // persists, so features can use pkexec for sysfs operations when needed.
+    const fanPerms = await window.__TAURI__.core.invoke('check_permissions');
+    if (fanPerms.success && fanPerms.data) {
+      console.log('[Permissions] ✓ Fan helper already installed, skipping startup dialog');
+      return true;
+    }
+
+    // First time: check if setup is needed
     const response = await window.__TAURI__.core.invoke('check_permissions_status');
     if (response.success && response.data) {
       if (!response.data.has_permissions) {
-        console.log('[Permissions] Missing permissions, showing setup dialog');
+        console.log('[Permissions] First time setup needed, showing dialog');
         showPermissionDialog();
         return false;
-      } else {
-        console.log('[Permissions] ✓ All permissions available');
-        return true;
       }
     }
   } catch (error) {
@@ -55,6 +62,10 @@ async function setupPermissions() {
     if (response.success) {
       console.log('[Permissions] ✓ Setup successful');
       hidePermissionDialog();
+      await checkInitialPermissions();
+      alert(
+        'Permissions configured successfully!\n\nPlease restart ThinkUtils for all changes to take effect.'
+      );
       return true;
     } else {
       console.error('[Permissions] ✗ Setup failed:', response.error);
@@ -112,11 +123,12 @@ async function initializeApp() {
   setupSecurityHandlers();
   setupAboutDialog();
   setupPermissionDialog();
-  checkInitialPermissions();
   startAutoUpdate();
 
-  // Check permissions at startup
+  // Check all permissions at startup (sysfs + fan helper + polkit rule).
+  // One dialog handles everything. After setup, re-check fan permissions.
   await checkAndSetupPermissions();
+  await checkInitialPermissions();
 
   // Load and apply all settings
   console.log('[ThinkUtils] Loading settings...');

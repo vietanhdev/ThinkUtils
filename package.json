@@ -1,7 +1,7 @@
 {
   "name": "thinkutils",
   "private": true,
-  "version": "0.1.5",
+  "version": "0.1.10",
   "type": "module",
   "scripts": {
     "tauri": "tauri",
@@ -18,7 +18,10 @@
     "format:check": "prettier --check 'src/**/*.{js,html,css,json}'",
     "validate": "npm run lint && npm run format:check",
     "precommit": "npm run validate",
-    "prepare": "husky"
+    "prepare": "husky",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
@@ -26,8 +29,11 @@
     "htmlhint": "^1.1.4",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.6",
+    "mermaid": "^11.14.0",
     "prettier": "^3.2.5",
     "stylelint": "^16.2.1",
-    "stylelint-config-standard": "^36.0.0"
+    "stylelint-config-standard": "^36.0.0",
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.17"
   }
 }

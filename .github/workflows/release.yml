@@ -76,6 +76,62 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Update APT repository
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          # Install dpkg-scanpackages
+          sudo apt-get install -y dpkg-dev
+
+          # Clone or create gh-pages branch
+          git fetch origin gh-pages:gh-pages 2>/dev/null || true
+          git worktree add gh-pages-dir gh-pages 2>/dev/null || {
+            git worktree add --detach gh-pages-dir
+            cd gh-pages-dir
+            git checkout --orphan gh-pages
+            git rm -rf . 2>/dev/null || true
+            cd ..
+          }
+
+          # Set up apt directory
+          mkdir -p gh-pages-dir/apt
+
+          # Copy the new .deb (keep only the latest version)
+          rm -f gh-pages-dir/apt/*.deb
+          cp src-tauri/target/release/bundle/deb/*.deb gh-pages-dir/apt/
+
+          # Generate APT repo metadata
+          cd gh-pages-dir/apt
+          dpkg-scanpackages --multiversion . /dev/null > Packages
+          gzip -k -f Packages
+
+          # Generate Release file
+          apt-ftparchive release . > Release
+
+          # Create index page
+          cat > ../index.html << 'HTMLEOF'
+          <!DOCTYPE html>
+          <html>
+          <head><title>ThinkUtils APT Repository</title></head>
+          <body>
+          <h1>ThinkUtils APT Repository</h1>
+          <p>Add this repository to install ThinkUtils via apt:</p>
+          <pre>
+          echo "deb [trusted=yes] https://gh.vietanh.dev/ThinkUtils/apt ./" | sudo tee /etc/apt/sources.list.d/thinkutils.list
+          sudo apt update
+          sudo apt install thinkutils
+          </pre>
+          </body>
+          </html>
+          HTMLEOF
+
+          # Commit and push
+          cd ..
+          git add -A
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update APT repository for ${{ steps.version.outputs.version }}"
+          git push origin gh-pages
+
       - name: Upload artifacts (non-tag builds)
         if: "!startsWith(github.ref, 'refs/tags/')"
         uses: actions/upload-artifact@v4

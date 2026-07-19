@@ -9,6 +9,7 @@ mod auth;
 mod permissions;
 mod settings;
 mod security;
+mod mcp;
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -83,6 +84,12 @@ pub fn run() {
             let saved_config = fan_curve::load_config_from_store(&app.handle());
             let fan_curve_state = fan_curve::FanCurveState::new(std::sync::Mutex::new(saved_config));
             app.manage(fan_curve_state);
+
+            // Initialize MCP server state (off by default)
+            let mcp_state = mcp::McpState::new(tokio::sync::Mutex::new(
+                mcp::McpServerState::default(),
+            ));
+            app.manage(mcp_state);
 
             // Start fan curve background task
             let app_handle = app.handle().clone();
@@ -174,7 +181,6 @@ pub fn run() {
             fan_control::get_sensor_data,
             fan_control::set_fan_speed,
             fan_control::check_permissions,
-            fan_control::update_permissions,
             // Fan Curve
             fan_curve::set_fan_curve,
             fan_curve::get_fan_curve,
@@ -209,6 +215,10 @@ pub fn run() {
             security::scan_path,
             security::quick_scan,
             security::install_clamav,
+            // MCP
+            mcp::get_mcp_status,
+            mcp::start_mcp_server,
+            mcp::stop_mcp_server,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

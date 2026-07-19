@@ -11,9 +11,6 @@ A powerful, native desktop application that unlocks the full potential of your T
 ### Home Dashboard
 ![Home Dashboard](./screenshots/home.png)
 
-### Extended Home View
-![Extended Home](./screenshots/home_extended.png)
-
 ### Fan Control
 ![Fan Control](./screenshots/fan_control.png)
 
@@ -23,11 +20,42 @@ A powerful, native desktop application that unlocks the full potential of your T
 ### System Monitor
 ![System Monitor](./screenshots/system_monitor.png)
 
+### Battery
+![Battery](./screenshots/battery.png)
+
 ### System Information
 ![System Info](./screenshots/system_info.png)
 
+### Security
+![Security](./screenshots/security.png)
+
+### AI Integration
+![AI Integration](./screenshots/ai_integration.png)
+
 ### Settings Sync
 ![Settings Sync](./screenshots/settings_sync.png)
+
+## Installation
+
+### Ubuntu/Debian (APT)
+
+```bash
+echo "deb [trusted=yes] https://gh.vietanh.dev/ThinkUtils/apt ./" | sudo tee /etc/apt/sources.list.d/thinkutils.list
+sudo apt update
+sudo apt install thinkutils
+```
+
+### Manual Download
+
+Download the latest `.deb`, `.rpm`, or `.AppImage` from [GitHub Releases](https://github.com/vietanhdev/ThinkUtils/releases).
+
+```bash
+# Debian/Ubuntu
+sudo dpkg -i thinkutils_*.deb
+
+# Fedora/RHEL
+sudo rpm -i thinkutils-*.rpm
+```
 
 ## Features
 
@@ -48,6 +76,7 @@ Take control of your ThinkPad's legendary cooling system. Whether you need whisp
   - **Auto Mode**: Let the system intelligently manage cooling based on temperature (recommended for most users)
   - **Manual Mode**: Set precise fan speed levels from 0 (silent) to 7 (maximum)—perfect for finding the sweet spot between noise and cooling
   - **Maximum Mode**: Run fans at full blast for intensive tasks like video rendering or gaming
+- **Fan Curve Editor**: Draw custom temperature-to-speed curves for fully automated, fine-grained control
 - **Temperature Sensors**: Monitor every thermal sensor in your system—CPU cores, GPU, battery, and more
 - **Permission Management**: Secure, one-time elevated access using pkexec—no need to run the entire app as root
 
@@ -83,21 +112,25 @@ Know your machine inside and out. Quick access to all your ThinkPad's hardware s
 - **Kernel Version**: Current Linux kernel version—useful for troubleshooting compatibility
 - **Hostname**: System identification for network management
 
+### 🛡️ Security
+Built-in security scanning powered by ClamAV.
+
+- **Virus Scanning**: Scan files and directories for threats
+- **Real-time Results**: View scan progress and detected threats
+
+### 🤖 AI Integration (MCP Server)
+Built-in MCP (Model Context Protocol) server that exposes system controls to AI assistants like Claude.
+
+- **AI-Powered Control**: Let AI assistants monitor and adjust your ThinkPad settings
+- **MCP Protocol**: Standard protocol supported by Claude Code, Claude Desktop, and other AI tools
+
 ### 🔄 Google Drive Sync
 Never lose your carefully tuned settings. Sync your ThinkUtils configuration to the cloud and restore it on any ThinkPad.
 
 - **Settings Backup**: Sync your fan mode, battery thresholds, and application preferences to Google Drive
 - **Cross-Device**: Switch between multiple ThinkPads? Keep your settings consistent across all your machines
 - **OAuth Integration**: Secure authentication using Google's OAuth—your credentials never touch ThinkUtils servers
-- **Note**: Requires Google OAuth credentials to be configured (see GOOGLE_OAUTH_SETUP.md)
-
-### 🎨 Modern UI
-A beautiful interface that feels right at home on your ThinkPad. Inspired by ThinkPad's iconic design language with modern touches.
-
-- **Dark Theme**: Easy on the eyes with a sleek dark interface accented by ThinkPad's signature red—perfect for late-night work sessions
-- **Custom Titlebar**: Frameless window design with native controls that integrates seamlessly with your desktop environment
-- **Responsive Design**: Clean, organized layout that makes complex system controls feel intuitive and accessible
-- **Real-time Updates**: All metrics refresh automatically—no manual refreshing needed
+- **Note**: Requires Google OAuth credentials to be configured (see [docs/development/google-oauth.md](docs/development/google-oauth.md))
 
 ## How it Works
 
@@ -154,25 +187,31 @@ sudo modprobe thinkpad_acpi
 
 **Debian/Ubuntu:**
 ```bash
-sudo apt install libwebkit2gtk-4.1-dev \
-    build-essential \
+sudo apt install build-essential \
+    cargo \
     curl \
-    wget \
     file \
-    libssl-dev \
+    git \
     libayatana-appindicator3-dev \
-    librsvg2-dev
+    librsvg2-dev \
+    libssl-dev \
+    libwebkit2gtk-4.1-dev \
+    npm \
+    wget
 ```
 
 **Fedora:**
 ```bash
-sudo dnf install webkit2gtk4.1-devel \
-    openssl-devel \
+sudo dnf install cargo \
     curl \
-    wget \
     file \
+    git \
     libappindicator-gtk3-devel \
-    librsvg2-devel
+    librsvg2-devel \
+    npm \
+    openssl-devel \
+    webkit2gtk4.1-devel \
+    wget
 ```
 
 ### Getting Started
@@ -180,7 +219,7 @@ sudo dnf install webkit2gtk4.1-devel \
 1. **Clone and install dependencies:**
 ```bash
 git clone https://github.com/vietanhdev/ThinkUtils.git
-cd thinkutils
+cd ThinkUtils
 npm install
 ```
 
@@ -198,182 +237,87 @@ The built packages will be in `src-tauri/target/release/bundle/`
 
 ### Code Quality & Linting
 
-ThinkUtils uses comprehensive linting and formatting tools to maintain code quality:
+ThinkUtils uses comprehensive linting and formatting tools:
 
-- **ESLint** - JavaScript linting
-- **HTMLHint** - HTML validation
-- **Stylelint** - CSS linting
-- **Prettier** - Code formatting
-- **Husky** - Git hooks for pre-commit checks
-- **lint-staged** - Run linters on staged files only
-
-#### Available Commands
+- **ESLint** — JavaScript linting
+- **HTMLHint** — HTML validation
+- **Stylelint** — CSS linting
+- **Prettier** — Code formatting
+- **Husky + lint-staged** — Pre-commit hooks on staged files
 
 ```bash
-# Run all linters
-npm run lint
-
-# Auto-fix issues
-npm run lint:fix
-
-# Format all files
-npm run format
-
-# Full validation (lint + format check)
-npm run validate
+npm run lint          # Run all linters
+npm run lint:fix      # Auto-fix issues
+npm run format        # Format all files
+npm run validate      # Full validation (lint + format check)
 ```
 
-#### Pre-commit Hooks
-
-Pre-commit hooks are automatically set up when you run `npm install`. They will:
-
-1. ✅ **Auto-format** staged files (JavaScript, HTML, CSS, JSON)
-2. ✅ **Lint** staged files and fix auto-fixable issues
-3. ✅ **Validate** all code before allowing commit
-4. ❌ **Block commit** if linting fails
-
-**What happens on commit:**
-```bash
-git commit -m "Your message"
-
-🔍 Running pre-commit checks...
-📝 Formatting and linting staged files...
-  ✓ JavaScript files formatted and linted
-  ✓ CSS files formatted and linted
-  ✓ HTML files validated
-✅ All checks passed!
-```
-
-**If issues are found:**
-```bash
-❌ Linting failed. Please fix the issues and try again.
-```
-
-The commit will be blocked until you fix the issues. Most issues can be auto-fixed:
-```bash
-npm run lint:fix
-git add .
-git commit -m "Your message"
-```
-
-#### IDE Integration
-
-**VS Code** (Recommended):
-1. Install recommended extensions (popup will appear)
-2. Reload VS Code
-3. Files will auto-format on save!
-
-Recommended extensions:
-- ESLint
-- Prettier
-- HTMLHint
-- Stylelint
-
-**Other IDEs:**
-See `LINTING_SETUP.md` for configuration instructions.
-
-#### Bypassing Pre-commit Hooks
-
-In rare cases where you need to bypass hooks (not recommended):
-```bash
-git commit --no-verify -m "Your message"
-```
+Pre-commit hooks run automatically on `git commit`. If linting fails, fix with `npm run lint:fix`, re-stage, and commit again.
 
 ### Project Structure
 
 ```
-thinkutils/
-├── src/                    # Frontend
-│   ├── index.html         # Main UI
-│   ├── styles.css         # Styling
-│   └── js/                # Modular JavaScript
-│       ├── app.js         # Main entry point
-│       ├── dom.js         # DOM references
-│       ├── state.js       # State management
-│       ├── utils.js       # Utilities
-│       ├── navigation.js  # View switching
-│       ├── titlebar.js    # Window controls
-│       ├── about.js       # About dialog
-│       └── views/         # Feature modules
+ThinkUtils/
+├── src/                        # Frontend (vanilla JS, no framework)
+│   ├── index.html              # Main UI
+│   ├── styles.css              # CSS entry point (imports modules)
+│   ├── styles/                 # Modular CSS (see docs/development/css.md)
+│   ├── icons/                  # SVG icons
+│   ├── assets/                 # Logo and static assets
+│   └── js/                     # JavaScript modules
+│       ├── app.js              # Initialization entry point
+│       ├── state.js            # Centralized state object
+│       ├── dom.js              # Cached DOM references
+│       ├── navigation.js       # View routing
+│       ├── settingsManager.js  # Settings load/save/apply
+│       ├── fanCurve.js         # Canvas-based curve editor
+│       ├── titlebar.js         # Custom window titlebar
+│       ├── about.js            # About dialog
+│       ├── templateLoader.js   # HTML template loading
+│       ├── utils.js            # Shared utilities
+│       └── views/              # One JS file per feature
 │           ├── home.js
 │           ├── fan.js
 │           ├── battery.js
 │           ├── performance.js
 │           ├── monitor.js
+│           ├── system.js
+│           ├── security.js
 │           ├── sync.js
-│           └── system.js
-├── src-tauri/             # Backend (Rust)
+│           └── mcp.js
+├── src-tauri/                  # Backend (Rust)
 │   ├── src/
-│   │   └── lib.rs         # Tauri commands
-│   └── tauri.conf.json    # Configuration
-├── .husky/                # Git hooks
-│   └── pre-commit         # Pre-commit validation
-├── .eslintrc.json         # ESLint config
-├── .prettierrc.json       # Prettier config
-├── .stylelintrc.json      # Stylelint config
-├── .htmlhintrc            # HTMLHint config
-└── .lintstagedrc.json     # lint-staged config
-```
-
-### Development Workflow
-
-1. **Create a feature branch:**
-```bash
-git checkout -b feature/your-feature
-```
-
-2. **Make your changes:**
-   - Edit files in `src/` for frontend
-   - Edit files in `src-tauri/src/` for backend
-
-3. **Test your changes:**
-```bash
-npm run tauri dev
-```
-
-4. **Validate code quality:**
-```bash
-npm run validate
-```
-
-5. **Commit your changes:**
-```bash
-git add .
-git commit -m "feat: add your feature"
-```
-   - Pre-commit hooks will automatically format and lint
-   - Commit will be blocked if validation fails
-
-6. **Push and create PR:**
-```bash
-git push origin feature/your-feature
-```
-
-### Coding Standards
-
-- **JavaScript**: ES6+ modules, single quotes, semicolons
-- **HTML**: HTML5, lowercase tags, double quotes for attributes
-- **CSS**: Standard CSS, consistent spacing
-- **Formatting**: 2-space indentation, LF line endings
-- **Commits**: Follow [Conventional Commits](https://www.conventionalcommits.org/)
-
-### Testing
-
-```bash
-# Run linters
-npm run lint
-
-# Run auto-fix
-npm run lint:fix
-
-# Full validation
-npm run validate
+│   │   ├── lib.rs              # Tauri command registration
+│   │   ├── fan_control.rs      # Manual fan speed control
+│   │   ├── fan_curve.rs        # Auto fan curve (background task)
+│   │   ├── battery.rs          # Battery info and thresholds
+│   │   ├── performance.rs      # CPU governor, turbo, power profiles
+│   │   ├── monitor.rs          # System stats (CPU, memory, disk, net)
+│   │   ├── permissions.rs      # One-time permission setup
+│   │   ├── security.rs         # ClamAV integration
+│   │   ├── sync.rs             # Google OAuth + Drive sync
+│   │   ├── settings.rs         # Persistent storage
+│   │   ├── system_info.rs      # Hardware info
+│   │   ├── auth.rs             # OAuth helpers
+│   │   └── mcp.rs              # MCP server
+│   ├── tauri.conf.json         # Tauri configuration
+│   └── icons/                  # Generated app icons
+├── docs/                       # Documentation
+├── scripts/                    # Build and install scripts
+├── polkit/                     # Polkit policy files
+└── screenshots/                # App screenshots
 ```
 
 ### Documentation
 
-- `src/js/README.md` - JavaScript module documentation
-- `docs/` - Feature documentation
+Full documentation at [thinkutils.nrl.ai](https://thinkutils.nrl.ai), or browse the `docs/` directory:
+- [Getting Started](docs/guide/getting-started.md) — Setup and first run
+- [Installation](docs/guide/installation.md) — Install methods
+- [Permissions](docs/guide/permissions.md) — How permissions work
+- [Architecture](docs/development/architecture.md) — Codebase overview
+- [CSS Architecture](docs/development/css.md) — Frontend styling structure
+- [Google OAuth Setup](docs/development/google-oauth.md) — Cloud sync configuration
+- [Icon Generation](docs/development/icons.md) — Regenerating app icons
 
 ## Usage
 
@@ -387,90 +331,15 @@ thinkutils
 ### Navigation
 
 Use the left sidebar to navigate between features:
-- **Home**: Quick settings and system overview
-- **Fan Control**: Manage cooling and temperatures
-- **Battery**: Battery health and charge thresholds
-- **Performance**: CPU governor and power profiles
-- **Monitor**: Real-time system resource monitoring
-- **System Info**: Hardware and OS details
-- **Sync**: Google Drive settings backup
-- **About**: Application information
-
-### Home Dashboard
-
-The home screen provides quick access to essential controls:
-
-1. **System Overview**: Monitor CPU usage/temperature, memory usage, fan speed, and battery level in real-time
-2. **Power Profile**: Click buttons to switch between Power Saver, Balanced, or Performance modes
-3. **CPU Governor**: Select CPU frequency scaling policy (Powersave, Balanced, Performance)
-4. **Turbo Boost**: Toggle CPU turbo frequencies on/off with a switch
-5. **Battery Threshold**: View current charge limit settings (configured in Battery view)
-
-### Fan Control
-
-Control your ThinkPad's cooling system:
-
-1. **Auto Mode** (Default): System manages fan speed automatically
-2. **Manual Mode**: Set specific fan level (0-7)
-   - 0: Silent (lowest speed)
-   - 7: Maximum speed
-3. **Maximum Mode**: Run fan at full speed for intensive cooling
-
-The status panel shows real-time temperature sensors and fan speeds.
-
-### Battery Management
-
-Optimize battery health and longevity:
-
-1. View all installed batteries with current charge levels
-2. Set **Start Charging** threshold (when to begin charging)
-3. Set **Stop Charging** threshold (when to stop charging)
-4. Click **Apply Thresholds** to save settings
-
-**Recommended for longevity**: Start at 40%, Stop at 80%
-
-### Performance Tuning
-
-Optimize CPU performance and power consumption:
-
-1. **CPU Governor**: Select scaling policy (performance, powersave, schedutil, etc.)
-2. **Power Profile**: Choose system-wide power mode
-3. **Turbo Boost**: Toggle CPU turbo frequencies on/off
-
-Monitor current frequency and min/max ranges in real-time.
-
-### System Monitor
-
-Track system resources in real-time:
-
-- **CPU**: Per-core usage with frequency and load averages (1/5/15 min)
-- **Memory**: RAM and swap utilization with used/available/total breakdown
-- **Disk**: Usage per mounted filesystem with device names
-- **Network**: Total bytes and packets transmitted/received per interface
-- **Processes**: Top processes by CPU/memory with PID, name, and status
-
-All metrics update automatically every 2 seconds.
-
-### Google Drive Sync
-
-Backup and sync your settings:
-
-1. Click **Sign in with Google** (requires OAuth configuration)
-2. Authorize ThinkUtils to access Google Drive
-3. Use **Sync Now** to backup current settings
-4. Use **Download Settings** to restore from cloud
-
-**Note**: Requires Google OAuth credentials configured in source code.
-
-### Permissions
-
-ThinkUtils may request elevated permissions for:
-- Fan control access
-- Battery threshold configuration
-- CPU governor changes
-- Power profile management
-
-All requests are handled securely using `pkexec`.
+- **Home** — Quick settings and system overview
+- **Fan Control** — Manage cooling and temperatures
+- **Battery** — Battery health and charge thresholds
+- **Performance** — CPU governor and power profiles
+- **Monitor** — Real-time system resource monitoring
+- **System Info** — Hardware and OS details
+- **Security** — Virus scanning
+- **MCP** — AI integration settings
+- **Sync** — Google Drive settings backup
 
 ## Compatibility
 
@@ -502,12 +371,7 @@ ThinkUtils is designed for IBM/Lenovo ThinkPad laptops running Linux.
    ```
 
 ### Permission errors
-ThinkUtils will automatically request elevated permissions. If issues persist:
-```bash
-sudo chmod 666 /proc/acpi/ibm/fan
-```
-
-Note: This needs to be done after each reboot unless you set up udev rules.
+Click "Setup Permissions" in the app, or see [Permissions](docs/guide/permissions.md).
 
 ### No temperature data
 Ensure lm-sensors is installed and configured:
@@ -516,36 +380,9 @@ sudo sensors-detect
 sensors
 ```
 
-## Project Structure
-
-```
-thinkutils/
-├── src/                    # Frontend (HTML/CSS/JS)
-│   ├── index.html         # Main UI with all views
-│   ├── styles.css         # ThinkPad-themed dark styling
-│   ├── main.js            # Application logic and Tauri commands
-│   └── icons/             # SVG icons
-│       └── fan.svg        # Custom fan icon
-├── src-tauri/             # Backend (Rust)
-│   ├── src/
-│   │   └── lib.rs         # Tauri commands and system access
-│   ├── tauri.conf.json    # Tauri configuration
-│   └── icons/             # Application icons
-├── ubuntu-installer.sh    # Package installation script
-└── docs/                  # Documentation
-    ├── THINKUTILS_MASTER_PLAN.md
-    ├── IMPLEMENTATION_GUIDE.md
-    ├── ROADMAP_VISUAL.md
-    ├── FAN_CONTROL_FEATURE.md
-    ├── BATTERY_FEATURE.md
-    ├── PERFORMANCE_FEATURE.md
-    └── MONITOR_FEATURE.md
-```
-
 ## Contributing
 
 Contributions are welcome! Areas for improvement:
-- Additional ThinkPad utilities (battery, performance, etc.)
 - Support for more ThinkPad models
 - UI/UX enhancements
 - Bug fixes and optimizations
@@ -554,8 +391,8 @@ Contributions are welcome! Areas for improvement:
 
 ThinkUtils is dual-licensed:
 
-- **LGPL v3** - For open source projects
-- **Commercial License** - For commercial/proprietary projects
+- **LGPL v3** — For open source projects
+- **Commercial License** — For commercial/proprietary projects
 
 For commercial licensing inquiries, please contact: https://www.vietanh.dev/contact
 
