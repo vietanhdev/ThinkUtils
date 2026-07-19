@@ -46,6 +46,11 @@ read_versions() {
     printf 'package-lock.json (pkgs)|%s\n'  "$(jq -r '.packages."".version' package-lock.json)"
     printf 'src-tauri/Cargo.toml|%s\n'      "$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -1)"
     printf 'src-tauri/tauri.conf.json|%s\n' "$(jq -r .version src-tauri/tauri.conf.json)"
+    # Packaging manifests. A stale version here publishes a package whose
+    # filename and contents disagree, and the AUR/COPR sources point at a git tag
+    # that does not exist.
+    printf 'packaging/aur/PKGBUILD|%s\n'    "$(sed -n 's/^pkgver=\(.*\)/\1/p' packaging/aur/PKGBUILD)"
+    printf 'packaging/copr spec|%s\n'       "$(sed -n 's/^Version: *\(.*\)/\1/p' packaging/copr/thinkutils.spec)"
 }
 
 if [ "$CHECK_ONLY" -eq 1 ]; then
@@ -112,6 +117,14 @@ edit src-tauri/Cargo.toml \
 edit package-lock.json \
     "0,/\"version\": *\"[^\"]*\"/s//\"version\": \"$NEW_VERSION\"/" \
     "package-lock.json (top level)"
+
+edit packaging/aur/PKGBUILD \
+    "0,/^pkgver=.*/s//pkgver=$NEW_VERSION/" \
+    "packaging/aur/PKGBUILD"
+
+edit packaging/copr/thinkutils.spec \
+    "0,/^Version: +.*/s//Version:        $NEW_VERSION/" \
+    "packaging/copr/thinkutils.spec"
 
 python3 - "$NEW_VERSION" <<'PY'
 import json, sys

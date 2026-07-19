@@ -1,0 +1,52 @@
+Source: thinkutils
+Section: utils
+Priority: optional
+Maintainer: Viet Anh Nguyen <vietanh.dev@gmail.com>
+# Launchpad builders have NO network access. Every crate is vendored into the
+# .orig tarball by scripts/build-ppa-source.sh and the build runs with
+# CARGO_NET_OFFLINE=true, so Build-Depends lists only the toolchain and native
+# libraries -- never librust-* packages.
+#
+# npm is deliberately absent, and that is not an oversight. tauri.conf.json has
+# no beforeBuildCommand and frontendDist points at a directory of static files,
+# so there is no frontend build step and no node_modules to vendor. That is the
+# single reason this package is tractable on a network-less builder.
+#
+# @RUST_BUILD_DEPS@ is substituted per series by build-ppa-source.sh:
+#   noble              -> rustc-1.83, cargo-1.83
+#                         (the default rustc there is 1.75, too old to even
+#                          parse a v4 Cargo.lock)
+#   resolute, stonking -> rustc, cargo
+Build-Depends:
+ debhelper-compat (= 13),
+@RUST_BUILD_DEPS@
+ pkg-config,
+ libwebkit2gtk-4.1-dev,
+ libgtk-3-dev,
+ libayatana-appindicator3-dev,
+ librsvg2-dev,
+ libssl-dev,
+Standards-Version: 4.6.2
+Homepage: https://github.com/vietanhdev/ThinkUtils
+Vcs-Git: https://github.com/vietanhdev/ThinkUtils.git
+Rules-Requires-Root: no
+
+Package: thinkutils
+# amd64 only, deliberately. thinkpad_acpi is an x86 platform driver and
+# ThinkPads are x86_64; claiming arm64 would commit Launchpad to builds nobody
+# can run.
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}, policykit-1 | polkit
+Recommends: lm-sensors
+Suggests: clamav
+Description: ThinkPad fan control, battery care and system monitoring
+ ThinkUtils is a desktop utility for Lenovo ThinkPad laptops running Linux.
+ It provides manual and temperature-curve fan control via thinkpad_acpi,
+ battery charge threshold management, CPU governor and turbo-boost control,
+ and live system monitoring.
+ .
+ Privileged operations go through a dedicated, package-owned helper authorised
+ by a narrow polkit rule; the application itself runs unprivileged.
+ .
+ Fan control additionally requires the thinkpad_acpi module to be loaded with
+ fan_control=1, which the application detects and can configure.

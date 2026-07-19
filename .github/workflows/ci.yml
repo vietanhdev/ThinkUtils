@@ -31,30 +31,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Check the four version declarations agree
-        run: |
-          set -euo pipefail
-          pkg=$(jq -r .version package.json)
-          lock=$(jq -r .version package-lock.json)
-          lockpkg=$(jq -r '.packages."".version' package-lock.json)
-          cargo=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -1)
-          tauri=$(jq -r .version src-tauri/tauri.conf.json)
-
-          printf 'package.json             : %s\n' "$pkg"
-          printf 'package-lock.json (top)  : %s\n' "$lock"
-          printf 'package-lock.json (pkgs) : %s\n' "$lockpkg"
-          printf 'src-tauri/Cargo.toml     : %s\n' "$cargo"
-          printf 'src-tauri/tauri.conf.json: %s\n' "$tauri"
-
-          fail=0
-          for v in "$lock" "$lockpkg" "$cargo" "$tauri"; do
-            [ "$v" = "$pkg" ] || fail=1
-          done
-          if [ "$fail" = "1" ]; then
-            echo "::error::version declarations disagree - see CLAUDE.md 'Version Bumping'"
-            exit 1
-          fi
-          echo "OK: all version declarations agree at $pkg"
+      # One script owns the list, so adding a packaging file cannot leave CI
+      # checking a stale subset of it.
+      - name: Check every version declaration agrees
+        run: ./scripts/bump-version.sh --check
 
   # Runs exactly what husky's pre-commit hook runs. That hook only sees STAGED
   # files, on machines that ran npm install - a convenience, not a gate.
@@ -300,6 +280,133 @@ jobs:
       - name: Run hardware profile tests
         working-directory: src-tauri
         run: cargo test --test hardware_profiles
+
+  # Everything above proves the code COMPILES and LINTS. Not one job has ever
+  # started the application. A Tauri binary can pass every check in this file and
+  # still die on launch with a dlopen panic for a library the .deb forgot to
+  # depend on, or come up showing an empty window because the frontend never
+  # mounted. The only assertion that catches that is installing the real package
+  # and looking at the real pixels.
+  #
+  # It runs in a container with no ThinkPad hardware, which is the point: it
+  # proves the app starts, renders its full UI, and degrades cleanly when
+  # /proc/acpi/ibm/fan is absent -- the environment a bug is most likely to hide
+  # in. See the header of the script for how it tells those states apart.
+  # Split in two on purpose. The packages must be BUILT on the glibc floor
+  # (ubuntu:22.04) or the binary requires GLIBC_2.39 and will not start on
+  # 22.04 or Debian 12 -- CI would be testing something no user receives. But a
+  # job running inside a container cannot spawn the sibling containers the
+  # launch test needs; the first attempt failed with "docker: command not found".
+  #
+  # So: build in the container, hand the artifacts to a normal runner, and let
+  # that runner drive Docker.
+  bundle:
+    needs: [rust, frontend]
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:22.04
+    defaults:
+      run:
+        # A bare container runs `run:` steps under dash, which has no pipefail.
+        shell: bash
+    timeout-minutes: 60
+    steps:
+      # Must precede checkout: the action needs git in the container, and running
+      # as root over a runner-owned workspace trips git's dubious-ownership guard.
+      - name: Bootstrap the 22.04 build image
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl file git jq pkg-config build-essential \
+            libssl-dev rpm xz-utils sudo binutils \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf xdg-utils
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: Build the real packages
+        # linuxdeploy is itself an AppImage and mounts via FUSE, which a container
+        # does not have. Without this the bundle step dies on a fuse error AFTER
+        # the .deb and .rpm have already built.
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: npm run tauri build
+
+      - name: Confirm the glibc floor
+        run: |
+          set -euo pipefail
+          # The whole reason this job runs in a container. Report a floor breach
+          # here rather than letting a user discover it as a broken download.
+          floor=$(objdump -T src-tauri/target/release/thinkutils \
+            | grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sort -uV | tail -1)
+          echo "highest glibc symbol required: ${floor}"
+          case "${floor}" in
+            GLIBC_2.3[6-9]|GLIBC_2.[4-9][0-9]|GLIBC_[3-9]*)
+              echo "::error::binary requires ${floor}, above the Ubuntu 22.04 floor (2.35)"
+              exit 1 ;;
+          esac
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/bundle/appimage/*.AppImage
+          retention-days: 7
+
+  # Everything above proves the code COMPILES. Not one job starts the app. A
+  # Tauri binary can pass every check here and still die on launch with a dlopen
+  # panic, or come up showing an empty window because the frontend never mounted.
+  gui-launch:
+    needs: bundle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: artifacts
+
+      # The script expects Tauri's bundle layout, not a flat artifact directory.
+      - name: Restore the bundle layout
+        run: |
+          set -euo pipefail
+          for kind in deb rpm appimage; do
+            mkdir -p "src-tauri/target/release/bundle/${kind}"
+          done
+          find artifacts -name '*.deb'      -exec mv {} src-tauri/target/release/bundle/deb/ ';'
+          find artifacts -name '*.rpm'      -exec mv {} src-tauri/target/release/bundle/rpm/ ';'
+          find artifacts -name '*.AppImage' -exec mv {} src-tauri/target/release/bundle/appimage/ ';'
+          find src-tauri/target/release/bundle -type f -print
+
+      - name: Launch-test the packages in clean containers
+        run: scripts/test-gui-packages-docker.sh
+
+      # A red run should come with the actual picture of the broken window, not
+      # just whatever reached stdout before the container was discarded.
+      - name: Upload screenshots, OCR text and app logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-launch-evidence
+          path: build/gui-test-out/
+          if-no-files-found: warn
+          retention-days: 14
 
   # A full VitePress production build, not a link check. VitePress compiles every
   # page as a Vue SFC, so a literal {{ }} in prose parses as an interpolation and

@@ -1,0 +1,28 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: thinkutils
+Upstream-Contact: Viet Anh Nguyen <vietanh.dev@gmail.com>
+Source: https://github.com/vietanhdev/ThinkUtils
+
+Files: *
+Copyright: 2024-2026 Viet Anh Nguyen
+License: LGPL-3.0-or-later
+
+Files: src-tauri/vendor/*
+Copyright: various upstream authors
+Comment: Vendored Rust dependencies, required because Launchpad builders have no
+ network access. Each crate carries its own licence in its directory; the tree
+ is overwhelmingly MIT and Apache-2.0, both compatible with LGPL-3.0-or-later.
+License: MIT or Apache-2.0
+
+License: LGPL-3.0-or-later
+ This package is free software; you can redistribute it and/or modify it under
+ the terms of the GNU Lesser General Public License as published by the Free
+ Software Foundation; either version 3 of the License, or (at your option) any
+ later version.
+ .
+ On Debian systems the full text is at /usr/share/common-licenses/LGPL-3.
+
+License: MIT or Apache-2.0
+ Vendored dependencies are provided under the MIT licence or the Apache
+ License 2.0 at the recipient's option. Full texts accompany each crate under
+ src-tauri/vendor/.

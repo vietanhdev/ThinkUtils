@@ -463,7 +463,7 @@ pub fn get_system_report() -> ApiResponse<SystemReport> {
         command_exists("pkexec"),
         fan_control_enabled,
         modprobe_conf_present,
-        std::path::Path::new(crate::fan_control::HELPER_PATH).exists(),
+        crate::fan_control::helper_path().is_some(),
     );
 
     ApiResponse {

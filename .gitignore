@@ -27,3 +27,6 @@ dist-ssr
 # VitePress
 docs/.vitepress/dist
 docs/.vitepress/cache
+
+# GUI launch-test output (screenshots, OCR text, app logs)
+build/

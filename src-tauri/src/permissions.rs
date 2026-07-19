@@ -2,7 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
-use crate::fan_control::{HELPER_PATH, HELPER_SCRIPT, POLKIT_RULE, POLKIT_RULE_PATH};
+use crate::fan_control::{
+    helper_is_packaged, helper_path, polkit_rule, HELPER_SCRIPT, HELPER_SELF_INSTALL_PATH,
+    POLKIT_RULE_PATH,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiResponse<T> {
@@ -47,7 +50,7 @@ pub async fn check_permissions_status() -> ApiResponse<PermissionStatus> {
     // Also check if fan control helper + polkit rule are installed
     // Only check the helper — /etc/polkit-1/rules.d/ is root-only so
     // Path::exists() on the polkit rule always fails for normal users.
-    if !Path::new(HELPER_PATH).exists() {
+    if helper_path().is_none() {
         // Can we at least write to the fan file directly?
         let fan_path = "/proc/acpi/ibm/fan";
         if Path::new(fan_path).exists()
@@ -119,22 +122,31 @@ pub async fn setup_permissions() -> ApiResponse<String> {
         script_lines.push("fi".to_string());
     }
 
-    // Also install the fan control helper + polkit rule so the user
-    // doesn't have to click "Grant Permissions" again on the fan page.
-    // Uses shared constants from fan_control module to avoid duplication.
-    script_lines.push(format!("cat > {} << 'HELPEREOF'", HELPER_PATH));
-    script_lines.push(HELPER_SCRIPT.trim().to_string());
-    script_lines.push("HELPEREOF".to_string());
-    script_lines.push(format!("chmod 755 {}", HELPER_PATH));
+    // Install the fan helper and polkit rule -- but only when this app owns
+    // them. On a distro-packaged install both files belong to dpkg/rpm/pacman,
+    // and rewriting them would put the package database out of sync with the
+    // filesystem and leave orphans behind on uninstall.
+    if helper_is_packaged() {
+        println!("[Permissions] Packaged helper detected; only adjusting sysfs permissions");
+    } else {
+        script_lines.push(format!(
+            "mkdir -p \"$(dirname {})\"",
+            HELPER_SELF_INSTALL_PATH
+        ));
+        script_lines.push(format!("cat > {} << 'HELPEREOF'", HELPER_SELF_INSTALL_PATH));
+        script_lines.push(HELPER_SCRIPT.trim().to_string());
+        script_lines.push("HELPEREOF".to_string());
+        script_lines.push(format!("chmod 755 {}", HELPER_SELF_INSTALL_PATH));
 
-    script_lines.push("mkdir -p /etc/polkit-1/rules.d".to_string());
-    script_lines.push(format!("cat > {} << 'RULEEOF'", POLKIT_RULE_PATH));
-    script_lines.push(POLKIT_RULE.trim().to_string());
-    script_lines.push("RULEEOF".to_string());
-    script_lines.push(
-        "systemctl reload polkit 2>/dev/null || killall -HUP polkitd 2>/dev/null || true"
-            .to_string(),
-    );
+        script_lines.push("mkdir -p /etc/polkit-1/rules.d".to_string());
+        script_lines.push(format!("cat > {} << 'RULEEOF'", POLKIT_RULE_PATH));
+        script_lines.push(polkit_rule().trim().to_string());
+        script_lines.push("RULEEOF".to_string());
+        script_lines.push(
+            "systemctl reload polkit 2>/dev/null || killall -HUP polkitd 2>/dev/null || true"
+                .to_string(),
+        );
+    }
 
     script_lines.push("echo 'Permissions setup complete!'".to_string());
     script_lines.push("exit 0".to_string());

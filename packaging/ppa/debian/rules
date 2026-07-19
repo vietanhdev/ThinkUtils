@@ -1,0 +1,67 @@
+#!/usr/bin/make -f
+# ThinkUtils — Debian packaging rules for the Launchpad PPA build.
+#
+# Deliberately NOT dh-cargo, which expects every crate packaged separately in
+# the archive. The source tarball ships a vendored copy of every dependency
+# under src-tauri/vendor/ plus a .cargo/config.toml redirecting crates-io to it,
+# so the whole build is offline — which is what Launchpad's network-less
+# builders require. See scripts/build-ppa-source.sh.
+#
+# Also deliberately NOT `tauri build`. The Tauri bundler downloads linuxdeploy
+# and AppImage runtimes at build time, which fails instantly on a builder with
+# no network — and it emits .deb/.rpm/.AppImage artifacts that are meaningless
+# inside a Debian build anyway. Plain cargo produces the binary; every file is
+# installed by hand below, which is also the only way to place the fan helper
+# somewhere FHS-legal (the bundler cannot express that).
+
+export CARGO_NET_OFFLINE = true
+# Keep cargo's state inside the build tree; the builder's $HOME is not writable.
+export CARGO_HOME = $(CURDIR)/debian/cargo-home
+export CARGO_INCREMENTAL = 0
+@RUST_PATH_LINE@
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	cd src-tauri && cargo build --release --offline --locked
+
+# The suite needs a real ThinkPad for some paths and network for none of it, but
+# running it here would slow every builder for no signal CI does not already
+# provide.
+override_dh_auto_test:
+
+override_dh_auto_install:
+	install -D -m0755 src-tauri/target/release/thinkutils \
+		debian/thinkutils/usr/bin/thinkutils
+
+	# The privileged fan helper. Package-owned, root:root, and at a path the
+	# app actually searches — see HELPER_CANDIDATES in src-tauri/src/fan_control.rs.
+	# NOT /usr/local: Debian Policy 9.1.2 forbids a package writing there.
+	install -D -m0755 packaging/helper/thinkutils-fan-control \
+		debian/thinkutils/usr/lib/thinkutils/thinkutils-fan-control
+
+	# Vendor polkit rules belong under /usr/share. /etc is the administrator's
+	# namespace; a package writing there shadows their rules and leaves a
+	# conffile behind on purge.
+	install -D -m0644 packaging/polkit/50-thinkutils.rules \
+		debian/thinkutils/usr/share/polkit-1/rules.d/50-thinkutils.rules
+
+	install -D -m0644 thinkutils.desktop \
+		debian/thinkutils/usr/share/applications/thinkutils.desktop
+	install -D -m0644 src-tauri/icons/128x128.png \
+		debian/thinkutils/usr/share/icons/hicolor/128x128/apps/thinkutils.png
+
+override_dh_auto_clean:
+	rm -rf debian/cargo-home
+	cd src-tauri && cargo clean --offline || true
+
+# CRITICAL: dh_clean deletes every *.orig file as "patch cruft", which removes
+# cargo's vendored Cargo.toml.orig files that .cargo-checksum.json references.
+# The offline build then dies with "failed to calculate checksum ...
+# Cargo.toml.orig: No such file" — on Launchpad only. A local build succeeds,
+# so this is invisible until upload.
+override_dh_clean:
+	dh_clean -X.orig
