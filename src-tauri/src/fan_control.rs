@@ -98,6 +98,146 @@ fn parse_fan_proc(content: &str) -> HashMap<String, String> {
     fans
 }
 
+/// Path to the modprobe config that enables fan control at boot.
+pub const MODPROBE_CONF_PATH: &str = "/etc/modprobe.d/thinkpad_acpi.conf";
+
+/// Whether the kernel module will accept fan writes at all.
+///
+/// thinkpad_acpi's `fan_set_level()` returns -EPERM unless the module was loaded
+/// with `fan_control=1`, and that parameter is mode 0444 — it cannot be toggled
+/// at runtime, so no amount of privilege escalation fixes it.
+///
+/// The driver zeroes `fan_control_commands` when the parameter is off, and
+/// `fan_read()` only emits the `commands:` lines when it is set. So the presence
+/// of those lines is a reliable, read-only probe for "writes will succeed".
+///
+/// Without this check the app reports EPERM as "Permission denied. Click Grant
+/// Permissions" — advice that can never work, because the problem is the module,
+/// not polkit.
+fn fan_control_is_enabled(proc_fan_content: &str) -> bool {
+    proc_fan_content
+        .lines()
+        .any(|l| l.trim_start().starts_with("commands:"))
+}
+
+/// What is standing between the user and working fan control.
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub enum FanReadiness {
+    /// Writes should work.
+    Ready,
+    /// The module needs `fan_control=1`; polkit cannot help.
+    NeedsModuleParam,
+    /// No thinkpad_acpi fan interface — not a supported ThinkPad, or the module
+    /// is not loaded.
+    NoThinkpadFan,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FanCapability {
+    pub readiness: FanReadiness,
+    /// True once the modprobe config exists, meaning the fix is applied but a
+    /// reboot or module reload is still needed for it to take effect.
+    pub modprobe_conf_present: bool,
+    pub message: String,
+}
+
+#[tauri::command]
+pub fn get_fan_capability() -> ApiResponse<FanCapability> {
+    let modprobe_conf_present = fs::read_to_string(MODPROBE_CONF_PATH)
+        .map(|c| c.contains("fan_control=1"))
+        .unwrap_or(false);
+
+    let (readiness, message) = match fs::read_to_string(PROC_FAN) {
+        Err(_) => (
+            FanReadiness::NoThinkpadFan,
+            "No ThinkPad fan interface found. Load the thinkpad_acpi module, or this model may not be supported.".to_string(),
+        ),
+        Ok(content) if fan_control_is_enabled(&content) => {
+            (FanReadiness::Ready, "Fan control is available.".to_string())
+        }
+        Ok(_) if modprobe_conf_present => (
+            FanReadiness::NeedsModuleParam,
+            "Fan control is configured but not active yet. Reboot, or reload the thinkpad_acpi module.".to_string(),
+        ),
+        Ok(_) => (
+            FanReadiness::NeedsModuleParam,
+            "The thinkpad_acpi module was loaded without fan_control=1, so it will refuse fan changes. This is a kernel module setting, not a permissions problem.".to_string(),
+        ),
+    };
+
+    ApiResponse {
+        success: true,
+        data: Some(FanCapability {
+            readiness,
+            modprobe_conf_present,
+            message,
+        }),
+        error: None,
+    }
+}
+
+/// Write the modprobe config and try to reload the module.
+#[tauri::command]
+pub async fn enable_fan_control() -> ApiResponse<String> {
+    // The reload can fail if the module is busy (an open /proc handle, a laptop
+    // dock driver holding it). That is not an error worth failing on -- the
+    // config file is written either way, so a reboot will apply it.
+    let script = format!(
+        "#!/bin/bash\nset -e\nprintf 'options thinkpad_acpi fan_control=1\\n' > {}\nmodprobe -r thinkpad_acpi 2>/dev/null && modprobe thinkpad_acpi 2>/dev/null || true\nexit 0\n",
+        MODPROBE_CONF_PATH
+    );
+
+    let temp_script = match create_secure_temp_script(&script) {
+        Ok(p) => p,
+        Err(e) => {
+            return ApiResponse {
+                success: false,
+                data: None,
+                error: Some(e),
+            }
+        }
+    };
+
+    let result = tokio::process::Command::new("pkexec")
+        .arg("bash")
+        .arg(&temp_script)
+        .output()
+        .await;
+    let _ = fs::remove_file(&temp_script);
+
+    match result {
+        Ok(output) if output.status.success() => {
+            // Re-probe rather than assume the reload worked.
+            let now_ready = fs::read_to_string(PROC_FAN)
+                .map(|c| fan_control_is_enabled(&c))
+                .unwrap_or(false);
+
+            ApiResponse {
+                success: true,
+                data: Some(if now_ready {
+                    "Fan control enabled.".to_string()
+                } else {
+                    "Fan control configured. Reboot to activate it — the module could not be reloaded while in use.".to_string()
+                }),
+                error: None,
+            }
+        }
+        Ok(output) => ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!(
+                "Could not enable fan control: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )),
+        },
+        Err(e) => ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Could not enable fan control: {}", e)),
+        },
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SensorData {
     pub temps: HashMap<String, String>,
@@ -225,6 +365,21 @@ pub async fn set_fan_speed(speed: String) -> ApiResponse<String> {
 
     println!("[Fan] Setting speed to: {}", speed);
     let command_str = format!("level {}", speed);
+
+    // Check the module parameter before trying anything. If fan_control=1 is
+    // missing the kernel returns -EPERM no matter who we are, and telling the
+    // user to grant permissions sends them somewhere that cannot help.
+    if let Ok(content) = fs::read_to_string(PROC_FAN) {
+        if !fan_control_is_enabled(&content) {
+            return ApiResponse {
+                success: false,
+                data: None,
+                error: Some(
+                    "The thinkpad_acpi module was loaded without fan_control=1, so the kernel will refuse fan changes. Enable it from the Fan Control page — this is a module setting, not a permissions problem.".to_string(),
+                ),
+            };
+        }
+    }
 
     // 1. Try direct write (no elevation needed)
     if fs::write(PROC_FAN, &command_str).is_ok() {
@@ -423,6 +578,31 @@ commands:\twatchdog <timeout> (0 disables, timeout is 0-120)
         let fans = parse_fan_proc("status:\tenabled\nlevel:\t7\nspeed:\t4500\n");
         assert_eq!(fans.get("level").map(String::as_str), Some("7"));
         assert_eq!(fans.get("Fan1").map(String::as_str), Some("4500 RPM"));
+    }
+
+    // -- fan_control=1 module parameter detection --
+
+    /// The whole point of this probe: without fan_control=1 the driver zeroes
+    /// fan_control_commands and fan_read() omits the commands: lines. Their
+    /// absence means every write will return -EPERM, and no amount of polkit
+    /// will change that.
+    #[test]
+    fn detects_fan_control_disabled_by_absent_commands_lines() {
+        let without = "status:\t\tenabled\nspeed:\t\t2413\nlevel:\t\tauto\n";
+        assert!(!fan_control_is_enabled(without));
+    }
+
+    #[test]
+    fn detects_fan_control_enabled_by_commands_lines() {
+        assert!(fan_control_is_enabled(SAMPLE_PROC_FAN));
+    }
+
+    #[test]
+    fn fan_control_detection_tolerates_empty_and_partial_input() {
+        assert!(!fan_control_is_enabled(""));
+        assert!(!fan_control_is_enabled("status:\tenabled"));
+        // A value that merely mentions the word must not count as a commands line.
+        assert!(!fan_control_is_enabled("level:\tcommands: not really"));
     }
 
     // -- The installed privileged helper --

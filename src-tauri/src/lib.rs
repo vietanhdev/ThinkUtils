@@ -179,6 +179,8 @@ pub fn run() {
             settings::update_setting,
             // Fan Control
             fan_control::get_sensor_data,
+            fan_control::get_fan_capability,
+            fan_control::enable_fan_control,
             fan_control::set_fan_speed,
             fan_control::check_permissions,
             // Fan Curve
