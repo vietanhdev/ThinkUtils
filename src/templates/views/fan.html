@@ -80,6 +80,12 @@
       <div class="fan-control-header">
         <h3>Control Mode</h3>
       </div>
+      <p class="card-description">
+        Taking manual control overrides the firmware's own thermal management. ThinkUtils hands the
+        fan back automatically when you leave manual mode, if temperature sensors stop responding,
+        and when the app closes — and arms the firmware watchdog meanwhile, so the fan returns to
+        automatic even if the app is killed.
+      </p>
 
       <!-- Mode Selector -->
       <div class="fan-mode-list">
@@ -221,6 +227,11 @@
           <span>Off</span>
           <span>Max</span>
         </div>
+        <p class="card-description">
+          Levels 0–7, not a percentage — the firmware picks the actual RPM for each level.
+          <strong>0 stops the fan entirely</strong>, which is silent but safe only at light load;
+          watch the temperature above if you hold it there.
+        </p>
       </div>
 
       <!-- Fan Curve Editor -->

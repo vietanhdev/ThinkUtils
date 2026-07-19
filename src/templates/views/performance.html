@@ -25,7 +25,11 @@
     <div class="card-header">
       <h3>CPU Governor</h3>
     </div>
-    <p class="card-description">Control CPU frequency scaling policy</p>
+    <p class="card-description">
+      How aggressively the CPU raises its clock speed. <strong>Powersave</strong> keeps it low until
+      work arrives — quieter and longer battery. <strong>Performance</strong> holds it high, which
+      is faster to respond but runs hotter and drains sooner.
+    </p>
     <div id="governor-buttons" class="option-grid"></div>
   </div>
 
@@ -34,7 +38,10 @@
     <div class="card-header">
       <h3>Power Profile</h3>
     </div>
-    <p class="card-description">System-wide power management profile</p>
+    <p class="card-description">
+      A single switch that tunes CPU, graphics and platform power together. Changing it may move the
+      CPU governor with it.
+    </p>
     <div id="profile-buttons" class="option-grid"></div>
   </div>
 
@@ -43,7 +50,10 @@
     <div class="card-header">
       <h3>Turbo Boost</h3>
     </div>
-    <p class="card-description">Enable or disable CPU turbo frequencies</p>
+    <p class="card-description">
+      Lets the CPU briefly exceed its base clock under load. Turning it off caps peak speed but
+      noticeably reduces heat and fan noise — useful on your lap or in a quiet room.
+    </p>
     <div class="turbo-control">
       <div class="turbo-toggle-wrapper">
         <span class="turbo-label">Turbo Boost</span>
