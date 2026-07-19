@@ -1,6 +1,21 @@
+import { LogPanel } from '../logPanel.js';
 import { escapeHtml } from '../utils.js';
 // Security View - Antivirus and Security Settings
 const { invoke } = window.__TAURI__.core;
+
+// Two near-identical copies of this lived here -- ~230 lines differing only in
+// element prefix and reveal delay. One implementation now, and it cancels its
+// pending line reveals so a second run cannot interleave with the first.
+const scanLogs = new LogPanel('scan-logs', 'btn-toggle-scan-logs', 30);
+const installLogs = new LogPanel('install-logs', 'btn-toggle-install-logs', 50);
+
+const showScanLogs = (scanType) => scanLogs.start(scanType);
+const updateScanLogs = (logs) => scanLogs.update(logs);
+const completeScanLogs = (ok) => scanLogs.complete(ok);
+
+const showInstallLogs = () => installLogs.start('Installing ClamAV');
+const updateInstallLogs = (logs) => installLogs.update(logs);
+const completeInstallLogs = (ok) => installLogs.complete(ok);
 
 let scanInProgress = false;
 
@@ -366,236 +381,11 @@ function showNotification(message, type = 'info') {
   }
 }
 
-function showScanLogs(scanType) {
-  const logsSection = document.getElementById('scan-logs-section');
-  const logsContent = document.getElementById('scan-logs-content');
-  const logsOutput = document.getElementById('scan-logs-output');
-  const titleText = document.getElementById('scan-logs-title-text');
-  const spinner = document.getElementById('scan-logs-spinner');
-
-  if (!logsSection) {
-    return;
-  }
-
-  // Show the section
-  logsSection.style.display = 'block';
-
-  // Expand the content
-  if (logsContent) {
-    logsContent.style.display = 'block';
-  }
-
-  // Update title
-  if (titleText) {
-    titleText.textContent = `${scanType} - In Progress`;
-  }
-
-  // Show spinner
-  if (spinner) {
-    spinner.style.display = 'inline-block';
-  }
-
-  // Clear previous logs
-  if (logsOutput) {
-    logsOutput.innerHTML = '<div class="log-line">Initializing scan...</div>';
-  }
-
-  // Setup toggle button
-  setupScanLogsToggle();
-}
-
-function updateScanLogs(logs) {
-  const output = document.getElementById('scan-logs-output');
-  if (!output) {
-    return;
-  }
-
-  // Clear and add all logs
-  output.innerHTML = '';
-
-  logs.forEach((log, index) => {
-    setTimeout(() => {
-      let className = 'log-line';
-      if (log.includes('✓')) {
-        className += ' log-success';
-      } else if (log.includes('✗')) {
-        className += ' log-error';
-      } else if (log.includes('⚠')) {
-        className += ' log-warning';
-      } else if (log.includes('⊘')) {
-        className += ' log-info';
-      } else if (log.includes('ERROR:')) {
-        className += ' log-error';
-      }
-
-      const logElement = document.createElement('div');
-      logElement.className = className;
-      logElement.textContent = log;
-      output.appendChild(logElement);
-
-      // Auto-scroll to bottom
-      output.scrollTop = output.scrollHeight;
-    }, index * 30);
-  });
-}
-
-function completeScanLogs(success) {
-  const titleText = document.getElementById('scan-logs-title-text');
-  const spinner = document.getElementById('scan-logs-spinner');
-
-  // Hide spinner
-  if (spinner) {
-    spinner.style.display = 'none';
-  }
-
-  // Update title
-  if (titleText) {
-    const scanType = titleText.textContent.split(' - ')[0];
-    titleText.textContent = success ? `${scanType} - Complete` : `${scanType} - Failed`;
-  }
-}
-
-function setupScanLogsToggle() {
-  const toggleBtn = document.getElementById('btn-toggle-scan-logs');
-  const logsContent = document.getElementById('scan-logs-content');
-
-  if (!toggleBtn || !logsContent) {
-    return;
-  }
-
-  // Remove old listeners
-  const newToggleBtn = toggleBtn.cloneNode(true);
-  toggleBtn.parentNode.replaceChild(newToggleBtn, toggleBtn);
-
-  newToggleBtn.addEventListener('click', () => {
-    const isExpanded = logsContent.style.display !== 'none';
-
-    if (isExpanded) {
-      logsContent.style.display = 'none';
-      newToggleBtn.classList.add('collapsed');
-    } else {
-      logsContent.style.display = 'block';
-      newToggleBtn.classList.remove('collapsed');
-    }
-  });
-}
-
-function showInstallLogs() {
-  const logsSection = document.getElementById('install-logs-section');
-  const logsContent = document.getElementById('install-logs-content');
-  const logsOutput = document.getElementById('install-logs-output');
-  const titleText = document.getElementById('install-logs-title-text');
-  const spinner = document.getElementById('install-logs-spinner');
-
-  if (!logsSection) {
-    return;
-  }
-
-  // Show the section
-  logsSection.style.display = 'block';
-
-  // Expand the content
-  if (logsContent) {
-    logsContent.style.display = 'block';
-  }
-
-  // Update title
-  if (titleText) {
-    titleText.textContent = 'Installation - In Progress';
-  }
-
-  // Show spinner
-  if (spinner) {
-    spinner.style.display = 'inline-block';
-  }
-
-  // Clear previous logs
-  if (logsOutput) {
-    logsOutput.innerHTML = '<div class="log-line">Starting installation...</div>';
-  }
-
-  // Setup toggle button
-  setupInstallLogsToggle();
-}
-
-function updateInstallLogs(logs) {
-  const output = document.getElementById('install-logs-output');
-  if (!output) {
-    return;
-  }
-
-  // Clear and add all logs
-  output.innerHTML = '';
-
-  logs.forEach((log, index) => {
-    setTimeout(() => {
-      let className = 'log-line';
-      if (log.includes('✓')) {
-        className += ' log-success';
-      } else if (log.includes('✗')) {
-        className += ' log-error';
-      } else if (log.includes('⚠')) {
-        className += ' log-warning';
-      } else if (log.includes('ERROR:')) {
-        className += ' log-error';
-      }
-
-      const logElement = document.createElement('div');
-      logElement.className = className;
-      logElement.textContent = log;
-      output.appendChild(logElement);
-
-      // Auto-scroll to bottom
-      output.scrollTop = output.scrollHeight;
-    }, index * 50);
-  });
-}
-
-function completeInstallLogs(success) {
-  const titleText = document.getElementById('install-logs-title-text');
-  const spinner = document.getElementById('install-logs-spinner');
-
-  // Hide spinner
-  if (spinner) {
-    spinner.style.display = 'none';
-  }
-
-  // Update title
-  if (titleText) {
-    titleText.textContent = success ? 'Installation - Complete' : 'Installation - Failed';
-  }
-}
-
 function hideInstallLogs() {
   const logsSection = document.getElementById('install-logs-section');
   if (logsSection) {
     logsSection.style.display = 'none';
   }
-}
-
-function setupInstallLogsToggle() {
-  const toggleBtn = document.getElementById('btn-toggle-install-logs');
-  const logsContent = document.getElementById('install-logs-content');
-
-  if (!toggleBtn || !logsContent) {
-    return;
-  }
-
-  // Remove old listeners
-  const newToggleBtn = toggleBtn.cloneNode(true);
-  toggleBtn.parentNode.replaceChild(newToggleBtn, toggleBtn);
-
-  newToggleBtn.addEventListener('click', () => {
-    const isExpanded = logsContent.style.display !== 'none';
-
-    if (isExpanded) {
-      logsContent.style.display = 'none';
-      newToggleBtn.classList.add('collapsed');
-    } else {
-      logsContent.style.display = 'block';
-      newToggleBtn.classList.remove('collapsed');
-    }
-  });
 }
 
 function showManualInstallDialog(instructions) {

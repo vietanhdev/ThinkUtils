@@ -1,6 +1,6 @@
 // Home View
 const { invoke } = window.__TAURI__.core;
-import { showStatus } from '../utils.js';
+import { setPowerProfile, setCpuGovernor, setTurboBoost, bindOnce } from '../hardwareControls.js';
 
 export async function updateHomeView() {
   try {
@@ -159,68 +159,20 @@ export async function updateHomeView() {
 }
 
 export function setupHomeActions() {
-  const profileBtns = document.querySelectorAll('.home-setting-btn[data-profile]');
-  profileBtns.forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const profile = btn.dataset.profile;
-      try {
-        showStatus(`Setting power profile to ${profile}...`, 'info');
-        const response = await invoke('set_power_profile', { profile });
-        if (response.success) {
-          showStatus(`✓ Power profile: ${profile}`, 'success');
-          updateHomeView();
-        } else {
-          showStatus(`Error: ${response.error}`, 'error');
-        }
-      } catch (error) {
-        showStatus(`Error: ${error}`, 'error');
-      }
-    });
+  document.querySelectorAll('.home-setting-btn[data-profile]').forEach((btn) => {
+    btn.addEventListener('click', () => setPowerProfile(btn.dataset.profile, updateHomeView));
   });
 
-  const governorBtns = document.querySelectorAll('.home-setting-btn[data-governor]');
+  const governorBtns = Array.from(document.querySelectorAll('.home-setting-btn[data-governor]'));
   governorBtns.forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const governor = btn.dataset.governor;
-      governorBtns.forEach((b) => (b.disabled = true));
-
-      try {
-        showStatus(`Setting CPU governor to ${governor}...`, 'info');
-        const response = await invoke('set_cpu_governor', { governor });
-
-        if (response.success) {
-          showStatus(`✓ CPU governor set to ${governor}`, 'success');
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          await updateHomeView();
-        } else {
-          showStatus(`Error: ${response.error || 'Failed to set governor'}`, 'error');
-        }
-      } catch (error) {
-        showStatus(`Error: ${error}`, 'error');
-      } finally {
-        governorBtns.forEach((b) => (b.disabled = false));
-      }
-    });
+    btn.addEventListener('click', () =>
+      setCpuGovernor(btn.dataset.governor, updateHomeView, governorBtns)
+    );
   });
 
-  const turboToggle = document.getElementById('home-turbo-toggle');
-  if (turboToggle) {
-    turboToggle.addEventListener('change', async (e) => {
-      const enabled = e.target.checked;
-      try {
-        showStatus(`${enabled ? 'Enabling' : 'Disabling'} turbo boost...`, 'info');
-        const response = await invoke('set_turbo_boost', { enabled });
-        if (response.success) {
-          showStatus(`✓ Turbo boost ${enabled ? 'enabled' : 'disabled'}`, 'success');
-          updateHomeView();
-        } else {
-          showStatus(`Error: ${response.error}`, 'error');
-          e.target.checked = !enabled;
-        }
-      } catch (error) {
-        showStatus(`Error: ${error}`, 'error');
-        e.target.checked = !enabled;
-      }
-    });
-  }
+  // bindOnce because this used to add a fresh listener on every render without
+  // removing the previous one.
+  bindOnce(document.getElementById('home-turbo-toggle'), 'change', (e) =>
+    setTurboBoost(e.target.checked, updateHomeView, e.target)
+  );
 }
