@@ -8,6 +8,7 @@ mod mcp;
 mod monitor;
 mod performance;
 mod permissions;
+mod privileged;
 mod security;
 mod settings;
 mod sync;
