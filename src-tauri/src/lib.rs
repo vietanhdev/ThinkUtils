@@ -220,6 +220,14 @@ pub fn run() {
             mcp::start_mcp_server,
             mcp::stop_mcp_server,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|_app, event| {
+            // Never exit leaving the fan under manual control. The firmware
+            // watchdog is the backstop for a hard kill, but on a clean exit we
+            // hand the fan back explicitly and immediately.
+            if let tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit = event {
+                fan_curve::restore_fan_to_auto_blocking();
+            }
+        });
 }
