@@ -28,7 +28,7 @@ pub fn get_system_info() -> ApiResponse<SystemInfo> {
         cpu: get_cpu_info(),
         memory: get_memory_info(),
     };
-    
+
     ApiResponse {
         success: true,
         data: Some(info),

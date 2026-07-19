@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::time::sleep;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_store::StoreExt;
+use tokio::time::sleep;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CurvePoint {
@@ -39,14 +39,16 @@ const CURVE_KEY: &str = "fan_curve";
 
 /// Save fan curve config to persistent storage
 fn save_config_to_store(app: &AppHandle, config: &FanCurveConfig) -> Result<(), String> {
-    let store = app.store(STORE_FILE)
+    let store = app
+        .store(STORE_FILE)
         .map_err(|e| format!("Failed to get store: {}", e))?;
 
-    let config_json = serde_json::to_value(config)
-        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+    let config_json =
+        serde_json::to_value(config).map_err(|e| format!("Failed to serialize config: {}", e))?;
 
     store.set(CURVE_KEY, config_json);
-    store.save()
+    store
+        .save()
         .map_err(|e| format!("Failed to save store: {}", e))?;
 
     println!("[Fan Curve] Configuration saved to store");
@@ -84,7 +86,9 @@ pub async fn set_fan_curve(
     state: tauri::State<'_, FanCurveState>,
     points: Vec<CurvePoint>,
 ) -> Result<(), String> {
-    let mut config = state.lock().map_err(|e| format!("Failed to lock state: {}", e))?;
+    let mut config = state
+        .lock()
+        .map_err(|e| format!("Failed to lock state: {}", e))?;
     config.points = points.clone();
 
     // Save to persistent storage
@@ -97,7 +101,9 @@ pub async fn set_fan_curve(
 pub async fn get_fan_curve(
     state: tauri::State<'_, FanCurveState>,
 ) -> Result<FanCurveConfig, String> {
-    let config = state.lock().map_err(|e| format!("Failed to lock state: {}", e))?;
+    let config = state
+        .lock()
+        .map_err(|e| format!("Failed to lock state: {}", e))?;
     Ok(config.clone())
 }
 
@@ -107,7 +113,9 @@ pub async fn enable_fan_curve(
     state: tauri::State<'_, FanCurveState>,
     enabled: bool,
 ) -> Result<(), String> {
-    let mut config = state.lock().map_err(|e| format!("Failed to lock state: {}", e))?;
+    let mut config = state
+        .lock()
+        .map_err(|e| format!("Failed to lock state: {}", e))?;
     config.enabled = enabled;
 
     // Save to persistent storage
@@ -191,7 +199,10 @@ fn get_cpu_temperature() -> Result<i32, String> {
                 if temp_label_path.exists() && temp_input_path.exists() {
                     if let Ok(label) = fs::read_to_string(&temp_label_path) {
                         let label_lower = label.to_lowercase();
-                        if label_lower.contains("cpu") || label_lower.contains("package") || label_lower.contains("core") {
+                        if label_lower.contains("cpu")
+                            || label_lower.contains("package")
+                            || label_lower.contains("core")
+                        {
                             if let Ok(content) = fs::read_to_string(&temp_input_path) {
                                 if let Ok(temp_millidegrees) = content.trim().parse::<i32>() {
                                     let temp = temp_millidegrees / 1000;
@@ -249,7 +260,10 @@ pub fn restore_fan_to_auto_blocking() {
     use std::fs;
     use std::io::Write;
 
-    if let Ok(mut file) = fs::OpenOptions::new().write(true).open("/proc/acpi/ibm/fan") {
+    if let Ok(mut file) = fs::OpenOptions::new()
+        .write(true)
+        .open("/proc/acpi/ibm/fan")
+    {
         if file.write_all(b"level auto").is_ok() {
             println!("[Fan Curve] Fan returned to automatic control on exit");
             return;
@@ -389,7 +403,10 @@ pub async fn fan_curve_background_task(app: AppHandle) {
         if last_level != Some(target_level) {
             match set_fan_speed_internal(target_level).await {
                 Ok(_) => {
-                    println!("[Fan Curve] Temp: {}°C -> Fan Level: {}", temp, target_level);
+                    println!(
+                        "[Fan Curve] Temp: {}°C -> Fan Level: {}",
+                        temp, target_level
+                    );
                     last_level = Some(target_level);
                     permission_error_reported = false;
                     arm_fan_watchdog().await;
@@ -400,9 +417,13 @@ pub async fn fan_curve_background_task(app: AppHandle) {
                     // Notify frontend once about permission issues
                     if !permission_error_reported {
                         permission_error_reported = true;
-                        let _ = app.emit_to("main", "fan-curve-error", serde_json::json!({
-                            "error": e,
-                        }));
+                        let _ = app.emit_to(
+                            "main",
+                            "fan-curve-error",
+                            serde_json::json!({
+                                "error": e,
+                            }),
+                        );
                     }
                 }
             }
@@ -410,10 +431,14 @@ pub async fn fan_curve_background_task(app: AppHandle) {
 
         // Always emit temperature and current level to frontend for live UI updates
         let display_level = last_level.unwrap_or(target_level);
-        if let Err(e) = app.emit_to("main", "fan-curve-update", serde_json::json!({
-            "temperature": temp,
-            "fan_level": display_level,
-        })) {
+        if let Err(e) = app.emit_to(
+            "main",
+            "fan-curve-update",
+            serde_json::json!({
+                "temperature": temp,
+                "fan_level": display_level,
+            }),
+        ) {
             eprintln!("[Fan Curve] Failed to emit event: {}", e);
         }
     }

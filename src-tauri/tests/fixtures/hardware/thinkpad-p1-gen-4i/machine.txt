@@ -1,0 +1,4 @@
+product_version=ThinkPad P1 Gen 4i
+product_name=20Y4S2ND00
+sys_vendor=LENOVO
+kernel=7.0.0-27-generic

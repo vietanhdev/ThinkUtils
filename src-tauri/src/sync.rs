@@ -1,15 +1,15 @@
-use serde::{Deserialize, Serialize};
 use chrono::Utc;
-use std::fs;
-use std::path::PathBuf;
-use oauth2::{
-    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge,
-    RedirectUrl, Scope, TokenResponse, TokenUrl,
-};
 use oauth2::basic::BasicClient;
 use oauth2::reqwest::async_http_client;
-use std::sync::{Arc, Mutex};
+use oauth2::{
+    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge, RedirectUrl,
+    Scope, TokenResponse, TokenUrl,
+};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 // Google OAuth credentials, supplied at build time. Never hardcode these:
 // a desktop binary cannot keep a secret, so anything embedded here is public.
@@ -44,7 +44,7 @@ impl Default for UserSettings {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct SyncState {
     pub is_logged_in: bool,
     pub user_email: Option<String>,
@@ -52,19 +52,6 @@ pub struct SyncState {
     pub settings: UserSettings,
     pub access_token: Option<String>,
     pub refresh_token: Option<String>,
-}
-
-impl Default for SyncState {
-    fn default() -> Self {
-        Self {
-            is_logged_in: false,
-            user_email: None,
-            last_sync: None,
-            settings: UserSettings::default(),
-            access_token: None,
-            refresh_token: None,
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -105,14 +92,14 @@ fn get_config_dir() -> Result<PathBuf, String> {
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
         .map_err(|_| "Could not find home directory".to_string())?;
-    
+
     let config_dir = PathBuf::from(home).join(".config").join("thinkutils");
-    
+
     if !config_dir.exists() {
         fs::create_dir_all(&config_dir)
             .map_err(|e| format!("Failed to create config directory: {}", e))?;
     }
-    
+
     Ok(config_dir)
 }
 
@@ -122,24 +109,23 @@ fn get_sync_state_path() -> Result<PathBuf, String> {
 
 fn load_sync_state() -> Result<SyncState, String> {
     let path = get_sync_state_path()?;
-    
+
     if !path.exists() {
         return Ok(SyncState::default());
     }
-    
-    let content = fs::read_to_string(&path)
-        .map_err(|e| format!("Failed to read sync state: {}", e))?;
-    
-    serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse sync state: {}", e))
+
+    let content =
+        fs::read_to_string(&path).map_err(|e| format!("Failed to read sync state: {}", e))?;
+
+    serde_json::from_str(&content).map_err(|e| format!("Failed to parse sync state: {}", e))
 }
 
 fn save_sync_state(state: &SyncState) -> Result<(), String> {
     let path = get_sync_state_path()?;
-    
+
     let content = serde_json::to_string_pretty(state)
         .map_err(|e| format!("Failed to serialize sync state: {}", e))?;
-    
+
     write_private(&path, &content)
 }
 
@@ -179,7 +165,9 @@ fn create_oauth_client() -> Result<BasicClient, String> {
     let client_id = ClientId::new(
         GOOGLE_CLIENT_ID
             .filter(|s| !s.is_empty())
-            .ok_or("Google sync is not configured in this build (THINKUTILS_GOOGLE_CLIENT_ID unset).")?
+            .ok_or(
+                "Google sync is not configured in this build (THINKUTILS_GOOGLE_CLIENT_ID unset).",
+            )?
             .to_string(),
     );
     let client_secret = ClientSecret::new(
@@ -192,56 +180,59 @@ fn create_oauth_client() -> Result<BasicClient, String> {
         .map_err(|e| format!("Invalid auth URL: {}", e))?;
     let token_url = TokenUrl::new("https://oauth2.googleapis.com/token".to_string())
         .map_err(|e| format!("Invalid token URL: {}", e))?;
-    
-    Ok(BasicClient::new(
-        client_id,
-        Some(client_secret),
-        auth_url,
-        Some(token_url),
+
+    Ok(
+        BasicClient::new(client_id, Some(client_secret), auth_url, Some(token_url))
+            .set_redirect_uri(
+                RedirectUrl::new(REDIRECT_URI.to_string())
+                    .map_err(|e| format!("Invalid redirect URL: {}", e))?,
+            ),
     )
-    .set_redirect_uri(
-        RedirectUrl::new(REDIRECT_URI.to_string())
-            .map_err(|e| format!("Invalid redirect URL: {}", e))?,
-    ))
 }
 
 // Initiate Google OAuth flow
 #[tauri::command]
 pub async fn google_auth_init() -> ApiResponse<AuthInitResponse> {
     println!("[Google] Initiating OAuth flow");
-    
+
     let client = match create_oauth_client() {
         Ok(c) => c,
-        Err(e) => return ApiResponse {
-            success: false,
-            data: None,
-            error: Some(format!("Failed to create OAuth client: {}", e)),
-        },
+        Err(e) => {
+            return ApiResponse {
+                success: false,
+                data: None,
+                error: Some(format!("Failed to create OAuth client: {}", e)),
+            }
+        }
     };
-    
+
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
-    
+
     let (auth_url, csrf_token) = client
         .authorize_url(CsrfToken::new_random)
-        .add_scope(Scope::new("https://www.googleapis.com/auth/userinfo.email".to_string()))
-        .add_scope(Scope::new("https://www.googleapis.com/auth/drive.file".to_string()))
+        .add_scope(Scope::new(
+            "https://www.googleapis.com/auth/userinfo.email".to_string(),
+        ))
+        .add_scope(Scope::new(
+            "https://www.googleapis.com/auth/drive.file".to_string(),
+        ))
         .set_pkce_challenge(pkce_challenge)
         .url();
-    
+
     // Store CSRF token and PKCE verifier for validation
     let mut state = OAUTH_STATE.lock().unwrap();
     state.insert(
         csrf_token.secret().clone(),
         (pkce_verifier.secret().clone(), csrf_token.secret().clone()),
     );
-    
+
     // Start local server to handle callback
     tokio::spawn(async move {
         if let Err(e) = start_callback_server().await {
             eprintln!("[OAuth] Callback server error: {}", e);
         }
     });
-    
+
     ApiResponse {
         success: true,
         data: Some(AuthInitResponse {
@@ -252,26 +243,23 @@ pub async fn google_auth_init() -> ApiResponse<AuthInitResponse> {
 }
 
 async fn start_callback_server() -> Result<(), String> {
-    use tiny_http::{Server, Response};
-    
-    let server = Server::http("127.0.0.1:8765")
-        .map_err(|e| format!("Failed to start server: {}", e))?;
-    
+    use tiny_http::{Response, Server};
+
+    let server =
+        Server::http("127.0.0.1:8765").map_err(|e| format!("Failed to start server: {}", e))?;
+
     println!("[OAuth] Callback server listening on {}", REDIRECT_URI);
-    
+
     // Handle one request then shutdown
     if let Ok(request) = server.recv() {
         let url = format!("http://localhost:8765{}", request.url());
-        
+
         if let Ok(parsed_url) = url::Url::parse(&url) {
-            let params: HashMap<String, String> = parsed_url
-                .query_pairs()
-                .into_owned()
-                .collect();
-            
+            let params: HashMap<String, String> = parsed_url.query_pairs().into_owned().collect();
+
             let code = params.get("code").cloned();
             let state = params.get("state").cloned();
-            
+
             if let (Some(code), Some(state)) = (code, state) {
                 // Exchange code for token
                 tokio::spawn(async move {
@@ -279,7 +267,7 @@ async fn start_callback_server() -> Result<(), String> {
                         eprintln!("[OAuth] Token exchange failed: {}", e);
                     }
                 });
-                
+
                 let response = Response::from_string(
                     "<html><body><h1>Login Successful!</h1><p>You can close this window and return to ThinkUtils.</p></body></html>"
                 );
@@ -287,34 +275,35 @@ async fn start_callback_server() -> Result<(), String> {
             }
         }
     }
-    
+
     Ok(())
 }
 
 async fn exchange_code_for_token(code: String, state: String) -> Result<(), String> {
     println!("[OAuth] Exchanging code for token");
-    
+
     let (pkce_verifier, _) = {
         let mut oauth_state = OAUTH_STATE.lock().unwrap();
-        oauth_state.remove(&state)
+        oauth_state
+            .remove(&state)
             .ok_or_else(|| "Invalid state parameter".to_string())?
     };
-    
+
     let client = create_oauth_client()?;
-    
+
     let token_result = client
         .exchange_code(AuthorizationCode::new(code))
         .set_pkce_verifier(oauth2::PkceCodeVerifier::new(pkce_verifier))
         .request_async(async_http_client)
         .await
         .map_err(|e| format!("Token exchange failed: {}", e))?;
-    
+
     let access_token = token_result.access_token().secret().clone();
     let refresh_token = token_result.refresh_token().map(|t| t.secret().clone());
-    
+
     // Get user info
     let user_info = get_user_info(&access_token).await?;
-    
+
     // Save tokens and user info
     let mut sync_state = load_sync_state()?;
     sync_state.is_logged_in = true;
@@ -322,11 +311,11 @@ async fn exchange_code_for_token(code: String, state: String) -> Result<(), Stri
     sync_state.access_token = Some(access_token);
     sync_state.refresh_token = refresh_token;
     sync_state.last_sync = Some(Utc::now().format("%Y-%m-%d %H:%M:%S").to_string());
-    
+
     save_sync_state(&sync_state)?;
-    
+
     println!("[OAuth] Login successful");
-    
+
     Ok(())
 }
 
@@ -338,7 +327,7 @@ async fn get_user_info(access_token: &str) -> Result<GoogleUserInfo, String> {
         .send()
         .await
         .map_err(|e| format!("Failed to get user info: {}", e))?;
-    
+
     response
         .json::<GoogleUserInfo>()
         .await
@@ -366,16 +355,18 @@ pub async fn google_auth_status() -> ApiResponse<SyncState> {
 #[tauri::command]
 pub async fn sync_to_cloud(settings: UserSettings) -> ApiResponse<String> {
     println!("[Sync] Syncing settings to Google Drive");
-    
+
     let mut state = match load_sync_state() {
         Ok(s) => s,
-        Err(e) => return ApiResponse {
-            success: false,
-            data: None,
-            error: Some(e),
-        },
+        Err(e) => {
+            return ApiResponse {
+                success: false,
+                data: None,
+                error: Some(e),
+            }
+        }
     };
-    
+
     if !state.is_logged_in || state.access_token.is_none() {
         return ApiResponse {
             success: false,
@@ -383,15 +374,15 @@ pub async fn sync_to_cloud(settings: UserSettings) -> ApiResponse<String> {
             error: Some("Not logged in".to_string()),
         };
     }
-    
+
     let access_token = state.access_token.as_ref().unwrap();
-    
+
     // Upload to Google Drive
     match upload_to_drive(access_token, &settings).await {
         Ok(_) => {
             state.settings = settings;
             state.last_sync = Some(Utc::now().format("%Y-%m-%d %H:%M:%S").to_string());
-            
+
             if let Err(e) = save_sync_state(&state) {
                 return ApiResponse {
                     success: false,
@@ -399,7 +390,7 @@ pub async fn sync_to_cloud(settings: UserSettings) -> ApiResponse<String> {
                     error: Some(e),
                 };
             }
-            
+
             ApiResponse {
                 success: true,
                 data: Some("Settings synced to Google Drive".to_string()),
@@ -416,16 +407,19 @@ pub async fn sync_to_cloud(settings: UserSettings) -> ApiResponse<String> {
 
 async fn upload_to_drive(access_token: &str, settings: &UserSettings) -> Result<(), String> {
     let client = reqwest::Client::new();
-    
+
     // Check if file exists
     let file_id = find_settings_file(access_token).await?;
-    
+
     let settings_json = serde_json::to_string_pretty(settings)
         .map_err(|e| format!("Failed to serialize settings: {}", e))?;
-    
+
     if let Some(id) = file_id {
         // Update existing file
-        let url = format!("https://www.googleapis.com/upload/drive/v3/files/{}?uploadType=media", id);
+        let url = format!(
+            "https://www.googleapis.com/upload/drive/v3/files/{}?uploadType=media",
+            id
+        );
         client
             .patch(&url)
             .bearer_auth(access_token)
@@ -440,27 +434,30 @@ async fn upload_to_drive(access_token: &str, settings: &UserSettings) -> Result<
             "name": "thinkutils_settings.json",
             "mimeType": "application/json"
         });
-        
+
         let boundary = "thinkutils_boundary";
         let body = format!(
             "--{}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{}\r\n--{}\r\nContent-Type: application/json\r\n\r\n{}\r\n--{}--",
             boundary,
-            metadata.to_string(),
+            metadata,
             boundary,
             settings_json,
             boundary
         );
-        
+
         client
             .post("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart")
             .bearer_auth(access_token)
-            .header("Content-Type", format!("multipart/related; boundary={}", boundary))
+            .header(
+                "Content-Type",
+                format!("multipart/related; boundary={}", boundary),
+            )
             .body(body)
             .send()
             .await
             .map_err(|e| format!("Failed to create file: {}", e))?;
     }
-    
+
     Ok(())
 }
 
@@ -473,12 +470,12 @@ async fn find_settings_file(access_token: &str) -> Result<Option<String>, String
         .send()
         .await
         .map_err(|e| format!("Failed to search files: {}", e))?;
-    
+
     let file_list: DriveFileList = response
         .json()
         .await
         .map_err(|e| format!("Failed to parse file list: {}", e))?;
-    
+
     Ok(file_list.files.first().and_then(|f| f.id.clone()))
 }
 
@@ -486,16 +483,18 @@ async fn find_settings_file(access_token: &str) -> Result<Option<String>, String
 #[tauri::command]
 pub async fn sync_from_cloud() -> ApiResponse<UserSettings> {
     println!("[Sync] Downloading settings from Google Drive");
-    
+
     let state = match load_sync_state() {
         Ok(s) => s,
-        Err(e) => return ApiResponse {
-            success: false,
-            data: None,
-            error: Some(e),
-        },
+        Err(e) => {
+            return ApiResponse {
+                success: false,
+                data: None,
+                error: Some(e),
+            }
+        }
     };
-    
+
     if !state.is_logged_in || state.access_token.is_none() {
         return ApiResponse {
             success: false,
@@ -503,9 +502,9 @@ pub async fn sync_from_cloud() -> ApiResponse<UserSettings> {
             error: Some("Not logged in".to_string()),
         };
     }
-    
+
     let access_token = state.access_token.as_ref().unwrap();
-    
+
     match download_from_drive(access_token).await {
         Ok(settings) => ApiResponse {
             success: true,
@@ -524,22 +523,25 @@ async fn download_from_drive(access_token: &str) -> Result<UserSettings, String>
     let file_id = find_settings_file(access_token)
         .await?
         .ok_or_else(|| "Settings file not found in Google Drive".to_string())?;
-    
+
     let client = reqwest::Client::new();
-    let url = format!("https://www.googleapis.com/drive/v3/files/{}?alt=media", file_id);
-    
+    let url = format!(
+        "https://www.googleapis.com/drive/v3/files/{}?alt=media",
+        file_id
+    );
+
     let response = client
         .get(&url)
         .bearer_auth(access_token)
         .send()
         .await
         .map_err(|e| format!("Failed to download file: {}", e))?;
-    
+
     let settings: UserSettings = response
         .json()
         .await
         .map_err(|e| format!("Failed to parse settings: {}", e))?;
-    
+
     Ok(settings)
 }
 
@@ -547,14 +549,14 @@ async fn download_from_drive(access_token: &str) -> Result<UserSettings, String>
 #[tauri::command]
 pub async fn google_logout() -> ApiResponse<String> {
     println!("[Google] Logging out");
-    
+
     match load_sync_state() {
         Ok(mut state) => {
             state.is_logged_in = false;
             state.user_email = None;
             state.access_token = None;
             state.refresh_token = None;
-            
+
             match save_sync_state(&state) {
                 Ok(_) => ApiResponse {
                     success: true,
@@ -597,7 +599,7 @@ pub fn get_settings() -> ApiResponse<UserSettings> {
 #[tauri::command]
 pub fn save_settings(settings: UserSettings) -> ApiResponse<String> {
     println!("[Settings] Saving: {:?}", settings);
-    
+
     match load_sync_state() {
         Ok(mut state) => {
             state.settings = settings;
@@ -633,7 +635,12 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos();
-        std::env::temp_dir().join(format!("thinkutils_test_{}_{}_{}", tag, std::process::id(), nanos))
+        std::env::temp_dir().join(format!(
+            "thinkutils_test_{}_{}_{}",
+            tag,
+            std::process::id(),
+            nanos
+        ))
     }
 
     #[cfg(unix)]
@@ -662,12 +669,19 @@ mod tests {
         let path = temp_path("tighten");
         fs::write(&path, "old").unwrap();
         fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
-        assert_eq!(fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o644);
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o644
+        );
 
         write_private(&path, "new").expect("write should succeed");
 
         let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
-        assert_eq!(mode, 0o600, "pre-existing file was not tightened; got {:o}", mode);
+        assert_eq!(
+            mode, 0o600,
+            "pre-existing file was not tightened; got {:o}",
+            mode
+        );
         assert_eq!(fs::read_to_string(&path).unwrap(), "new");
 
         let _ = fs::remove_file(&path);

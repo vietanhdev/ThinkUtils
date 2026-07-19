@@ -1,8 +1,8 @@
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::process::Command;
-use regex::Regex;
 
 const PROC_FAN: &str = "/proc/acpi/ibm/fan";
 pub const HELPER_PATH: &str = "/usr/local/bin/thinkutils-fan-control";
@@ -49,9 +49,7 @@ polkit.addRule(function(action, subject) {
 "#;
 
 /// Valid fan speed values (whitelist)
-const VALID_SPEEDS: &[&str] = &[
-    "auto", "full-speed", "0", "1", "2", "3", "4", "5", "6", "7",
-];
+const VALID_SPEEDS: &[&str] = &["auto", "full-speed", "0", "1", "2", "3", "4", "5", "6", "7"];
 
 /// Whether a fan speed is one this app is willing to send to the hardware.
 ///
@@ -143,11 +141,11 @@ pub struct FanCapability {
 
 #[tauri::command]
 pub fn get_fan_capability() -> ApiResponse<FanCapability> {
-    let modprobe_conf_present = fs::read_to_string(MODPROBE_CONF_PATH)
+    let modprobe_conf_present = crate::hardware_root::read_to_string(MODPROBE_CONF_PATH)
         .map(|c| c.contains("fan_control=1"))
         .unwrap_or(false);
 
-    let (readiness, message) = match fs::read_to_string(PROC_FAN) {
+    let (readiness, message) = match crate::hardware_root::read_to_string(PROC_FAN) {
         Err(_) => (
             FanReadiness::NoThinkpadFan,
             "No ThinkPad fan interface found. Load the thinkpad_acpi module, or this model may not be supported.".to_string(),
@@ -208,7 +206,7 @@ pub async fn enable_fan_control() -> ApiResponse<String> {
     match result {
         Ok(output) if output.status.success() => {
             // Re-probe rather than assume the reload worked.
-            let now_ready = fs::read_to_string(PROC_FAN)
+            let now_ready = crate::hardware_root::read_to_string(PROC_FAN)
                 .map(|c| fan_control_is_enabled(&c))
                 .unwrap_or(false);
 
@@ -270,11 +268,10 @@ pub fn create_secure_temp_script(content: &str) -> Result<String, String> {
         .open(&path)
         .map_err(|e| format!("Failed to create temp script: {}", e))?;
 
-    file.write_all(content.as_bytes())
-        .map_err(|e| {
-            let _ = fs::remove_file(&path);
-            format!("Failed to write temp script: {}", e)
-        })?;
+    file.write_all(content.as_bytes()).map_err(|e| {
+        let _ = fs::remove_file(&path);
+        format!("Failed to write temp script: {}", e)
+    })?;
 
     Ok(path)
 }
@@ -286,8 +283,7 @@ pub fn create_secure_temp_script(content: &str) -> Result<String, String> {
         .unwrap_or_default()
         .as_nanos();
     let path = format!("/tmp/thinkutils_{}.sh", random);
-    fs::write(&path, content)
-        .map_err(|e| format!("Failed to create temp script: {}", e))?;
+    fs::write(&path, content).map_err(|e| format!("Failed to create temp script: {}", e))?;
     Ok(path)
 }
 
@@ -297,7 +293,7 @@ pub fn get_sensor_data() -> ApiResponse<SensorData> {
     let mut fans = HashMap::new();
 
     // Get fan info from /proc/acpi/ibm/fan
-    match fs::read_to_string(PROC_FAN) {
+    match crate::hardware_root::read_to_string(PROC_FAN) {
         Ok(content) => {
             fans.extend(parse_fan_proc(&content));
         }
@@ -315,7 +311,10 @@ pub fn get_sensor_data() -> ApiResponse<SensorData> {
         Ok(output) => {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
+                // Both patterns are compiled once. rpm_re used to be rebuilt on
+                // every line of `sensors` output, which is the hot path here.
                 let temp_re = Regex::new(r"^(.+?):\s+\+?([0-9.]+°C)").unwrap();
+                let rpm_re = Regex::new(r"(\d+\s*RPM)").unwrap();
 
                 for line in stdout.lines() {
                     if let Some(caps) = temp_re.captures(line) {
@@ -330,18 +329,24 @@ pub fn get_sensor_data() -> ApiResponse<SensorData> {
                     if line.starts_with("fan") && line.contains("RPM") {
                         if let Some((label, rest)) = line.split_once(':') {
                             let label = label.trim();
-                            if let Some(rpm_match) = Regex::new(r"(\d+\s*RPM)").unwrap().find(rest) {
+                            if let Some(rpm_match) = rpm_re.find(rest) {
                                 fans.insert(label.to_string(), rpm_match.as_str().to_string());
                             }
                         }
                     }
                 }
             } else {
-                temps.insert("Info".to_string(), "Install lm-sensors for temperature data".to_string());
+                temps.insert(
+                    "Info".to_string(),
+                    "Install lm-sensors for temperature data".to_string(),
+                );
             }
         }
         Err(_) => {
-            temps.insert("Info".to_string(), "Install lm-sensors: sudo apt install lm-sensors".to_string());
+            temps.insert(
+                "Info".to_string(),
+                "Install lm-sensors: sudo apt install lm-sensors".to_string(),
+            );
         }
     }
 
@@ -363,13 +368,26 @@ pub async fn set_fan_speed(speed: String) -> ApiResponse<String> {
         };
     }
 
+    // Reads may come from a captured hardware profile; writes never may. A test
+    // must not be able to believe it changed a real fan.
+    if crate::hardware_root::is_simulated() {
+        return ApiResponse {
+            success: false,
+            data: None,
+            error: Some(
+                "Running against a simulated hardware profile. Fan changes are disabled."
+                    .to_string(),
+            ),
+        };
+    }
+
     println!("[Fan] Setting speed to: {}", speed);
     let command_str = format!("level {}", speed);
 
     // Check the module parameter before trying anything. If fan_control=1 is
     // missing the kernel returns -EPERM no matter who we are, and telling the
     // user to grant permissions sends them somewhere that cannot help.
-    if let Ok(content) = fs::read_to_string(PROC_FAN) {
+    if let Ok(content) = crate::hardware_root::read_to_string(PROC_FAN) {
         if !fan_control_is_enabled(&content) {
             return ApiResponse {
                 success: false,
@@ -513,8 +531,18 @@ mod tests {
     #[test]
     fn rejects_out_of_range_and_malformed_speeds() {
         for s in [
-            "8", "-1", "99", "AUTO", "Auto", "full speed", "fullspeed", "",
-            " 3", "3 ", "0x3", "level 3",
+            "8",
+            "-1",
+            "99",
+            "AUTO",
+            "Auto",
+            "full speed",
+            "fullspeed",
+            "",
+            " 3",
+            "3 ",
+            "0x3",
+            "level 3",
         ] {
             assert!(!is_valid_speed(s), "'{}' should be rejected", s);
         }
@@ -570,7 +598,10 @@ commands:\twatchdog <timeout> (0 disables, timeout is 0-120)
         assert!(parse_fan_proc("").is_empty());
         assert!(parse_fan_proc("no colon here\nanother line").is_empty());
         // A key with no value should not panic and should yield an empty string.
-        assert_eq!(parse_fan_proc("level:").get("level").map(String::as_str), Some(""));
+        assert_eq!(
+            parse_fan_proc("level:").get("level").map(String::as_str),
+            Some("")
+        );
     }
 
     #[test]
@@ -610,15 +641,18 @@ commands:\twatchdog <timeout> (0 disables, timeout is 0-120)
     /// Write HELPER_SCRIPT to a temp file and run it, so we test the bash that
     /// actually gets installed at HELPER_PATH and invoked under pkexec.
     fn run_helper(arg: &str) -> std::process::Output {
-        use std::os::unix::fs::OpenOptionsExt;
         use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
 
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos();
-        let path = std::env::temp_dir()
-            .join(format!("thinkutils_helper_test_{}_{}.sh", std::process::id(), nanos));
+        let path = std::env::temp_dir().join(format!(
+            "thinkutils_helper_test_{}_{}.sh",
+            std::process::id(),
+            nanos
+        ));
 
         let mut f = fs::OpenOptions::new()
             .create_new(true)
@@ -629,7 +663,11 @@ commands:\twatchdog <timeout> (0 disables, timeout is 0-120)
         f.write_all(HELPER_SCRIPT.as_bytes()).expect("write helper");
         drop(f);
 
-        let out = Command::new("bash").arg(&path).arg(arg).output().expect("run helper");
+        let out = Command::new("bash")
+            .arg(&path)
+            .arg(arg)
+            .output()
+            .expect("run helper");
         let _ = fs::remove_file(&path);
         out
     }
@@ -739,7 +777,11 @@ commands:\twatchdog <timeout> (0 disables, timeout is 0-120)
     fn helper_path_is_not_user_writable_location() {
         assert!(HELPER_PATH.starts_with("/usr/local/bin/") || HELPER_PATH.starts_with("/usr/bin/"));
         for bad in ["/tmp/", "/var/tmp/", "/home/", "/dev/shm/"] {
-            assert!(!HELPER_PATH.starts_with(bad), "helper must not live in {}", bad);
+            assert!(
+                !HELPER_PATH.starts_with(bad),
+                "helper must not live in {}",
+                bad
+            );
         }
     }
 }
