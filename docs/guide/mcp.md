@@ -4,6 +4,14 @@ ThinkUtils includes a built-in MCP (Model Context Protocol) server that exposes 
 
 ![AI Integration](/screenshots/ai_integration.png)
 
+
+::: tip Port changed in a recent release
+The default MCP port is now **8779**. It was 8765, which collided with the
+port the Google Drive sync login uses for its OAuth callback — with the MCP
+server running, sign-in would silently never complete. If you configured a
+client against 8765, update it or set the port back on the AI Integration page.
+:::
+
 ## What is MCP?
 
 [Model Context Protocol](https://modelcontextprotocol.io) is a standard protocol that lets AI assistants interact with external tools. ThinkUtils implements an MCP server so AI tools can monitor and control your ThinkPad settings.
@@ -28,7 +36,7 @@ Start the MCP server from the app's MCP page, then configure your AI tool:
 ### Claude Code
 
 ```bash
-claude mcp add --transport sse thinkutils http://127.0.0.1:8765/sse
+claude mcp add --transport sse thinkutils http://127.0.0.1:8779/sse
 ```
 
 Or add to `.mcp.json` in your project:
@@ -38,7 +46,7 @@ Or add to `.mcp.json` in your project:
   "mcpServers": {
     "thinkutils": {
       "type": "sse",
-      "url": "http://127.0.0.1:8765/sse"
+      "url": "http://127.0.0.1:8779/sse"
     }
   }
 }
@@ -52,7 +60,7 @@ Add to `~/.config/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "thinkutils": {
-      "url": "http://127.0.0.1:8765/sse"
+      "url": "http://127.0.0.1:8779/sse"
     }
   }
 }
@@ -66,7 +74,7 @@ Add to `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (global):
 {
   "mcpServers": {
     "thinkutils": {
-      "url": "http://127.0.0.1:8765/sse"
+      "url": "http://127.0.0.1:8779/sse"
     }
   }
 }
@@ -80,7 +88,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 {
   "mcpServers": {
     "thinkutils": {
-      "url": "http://127.0.0.1:8765/sse"
+      "url": "http://127.0.0.1:8779/sse"
     }
   }
 }
@@ -94,7 +102,7 @@ Add to `~/.lmstudio/mcp.json`:
 {
   "mcpServers": {
     "thinkutils": {
-      "url": "http://127.0.0.1:8765/sse"
+      "url": "http://127.0.0.1:8779/sse"
     }
   }
 }
@@ -107,7 +115,7 @@ Or in the app: switch to the **Program** tab, click **Install**, then **Edit mcp
 In ChatGPT Desktop, click your profile > **Settings** > **Connectors** > **Advanced settings**, enable **Developer mode**, then go back to Connectors and click **Create**:
 
 - **Name**: ThinkUtils
-- **Server URL**: `http://127.0.0.1:8765/sse`
+- **Server URL**: `http://127.0.0.1:8779/sse`
 
 ::: info
 Requires ChatGPT Desktop with MCP support (Plus/Team/Enterprise).
@@ -115,4 +123,4 @@ Requires ChatGPT Desktop with MCP support (Plus/Team/Enterprise).
 
 ### Other Tools
 
-For any MCP-compatible client, configure an SSE server with URL `http://127.0.0.1:8765/sse`.
+For any MCP-compatible client, configure an SSE server with URL `http://127.0.0.1:8779/sse`.

@@ -17,6 +17,16 @@ use std::sync::{Arc, Mutex};
 // Create credentials at https://console.cloud.google.com (APIs & Services > Credentials).
 const GOOGLE_CLIENT_ID: Option<&str> = option_env!("THINKUTILS_GOOGLE_CLIENT_ID");
 const GOOGLE_CLIENT_SECRET: Option<&str> = option_env!("THINKUTILS_GOOGLE_CLIENT_SECRET");
+/// Port the OAuth callback listener binds while a login is in flight.
+///
+/// Must differ from the MCP server's default port: they cannot both bind it, and
+/// the failure is silent -- with MCP running, the callback server fails to bind
+/// and Google login just never completes. mcp.rs asserts they differ.
+///
+/// This value is also registered as the redirect URI in Google Cloud Console, so
+/// changing it requires updating the OAuth client. That is why the MCP port moved
+/// instead of this one.
+pub const OAUTH_CALLBACK_PORT: u16 = 8765;
 const REDIRECT_URI: &str = "http://localhost:8765/callback";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -245,8 +255,8 @@ pub async fn google_auth_init() -> ApiResponse<AuthInitResponse> {
 async fn start_callback_server() -> Result<(), String> {
     use tiny_http::{Response, Server};
 
-    let server =
-        Server::http("127.0.0.1:8765").map_err(|e| format!("Failed to start server: {}", e))?;
+    let server = Server::http(format!("127.0.0.1:{}", OAUTH_CALLBACK_PORT).as_str())
+        .map_err(|e| format!("Failed to start server: {}", e))?;
 
     println!("[OAuth] Callback server listening on {}", REDIRECT_URI);
 
@@ -685,5 +695,24 @@ mod tests {
         assert_eq!(fs::read_to_string(&path).unwrap(), "new");
 
         let _ = fs::remove_file(&path);
+    }
+}
+
+#[cfg(test)]
+mod port_tests {
+    use super::*;
+
+    /// REDIRECT_URI embeds the port as a literal because a const cannot call
+    /// format!. If the constant moves and the URI does not, the callback listens
+    /// on one port while Google redirects to another -- and login hangs with no
+    /// error anywhere.
+    #[test]
+    fn redirect_uri_matches_the_callback_port() {
+        assert!(
+            REDIRECT_URI.contains(&format!(":{}/", OAUTH_CALLBACK_PORT)),
+            "REDIRECT_URI ({}) does not use OAUTH_CALLBACK_PORT ({})",
+            REDIRECT_URI,
+            OAUTH_CALLBACK_PORT
+        );
     }
 }

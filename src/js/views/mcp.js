@@ -147,7 +147,7 @@ async function toggleMcpServer() {
       const hostInput = document.getElementById('mcp-host');
       const portInput = document.getElementById('mcp-port');
       const host = hostInput ? hostInput.value : '127.0.0.1';
-      const port = portInput ? parseInt(portInput.value) || 8765 : 8765;
+      const port = portInput ? parseInt(portInput.value) || 8779 : 8779;
 
       const response = await invoke('start_mcp_server', { host, port });
       if (!response.success && text) {

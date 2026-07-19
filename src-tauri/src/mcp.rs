@@ -8,6 +8,13 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
+/// Default port for the MCP server.
+///
+/// Deliberately not 8765: that is sync.rs's OAuth callback port, and while the
+/// MCP server held it the callback listener could not bind, so Google login
+/// failed with no visible error. A test asserts the two stay different.
+pub const DEFAULT_MCP_PORT: u16 = 8779;
+
 const VALID_FAN_SPEEDS: &[&str] = &["auto", "full-speed", "0", "1", "2", "3", "4", "5", "6", "7"];
 
 fn validate_fan_speed(speed: &str) -> Option<String> {
@@ -68,7 +75,7 @@ impl Default for McpServerState {
         Self {
             cancel_token: None,
             host: "127.0.0.1".to_string(),
-            port: 8765,
+            port: DEFAULT_MCP_PORT,
         }
     }
 }
@@ -166,7 +173,7 @@ impl ThinkUtilsHandler {
         format!(
             "Status: {}\nCapacity: {}%\nCycle Count: {}\nTechnology: {}\nStart Threshold: {}%\nStop Threshold: {}%",
             r("status"), r("capacity"), r("cycle_count"), r("technology"),
-            r("charge_start_threshold"), r("charge_stop_threshold"),
+            r("charge_control_start_threshold"), r("charge_control_end_threshold"),
         )
     }
 
@@ -175,18 +182,19 @@ impl ThinkUtilsHandler {
         if let Some(err) = validate_battery_thresholds(req.start, req.stop) {
             return err;
         }
+        // Resolved rather than hardcoded: the attribute names differ between the
+        // generic kernel API and thinkpad_acpi's older spelling, and this module
+        // used to name a different pair than battery.rs.
+        let Some((start_path, stop_path)) = crate::battery::threshold_paths() else {
+            return "This machine exposes no battery charge threshold controls.".to_string();
+        };
+
         let mut r = Vec::new();
-        match fs::write(
-            "/sys/class/power_supply/BAT0/charge_stop_threshold",
-            req.stop.to_string(),
-        ) {
+        match fs::write(&stop_path, req.stop.to_string()) {
             Ok(_) => r.push(format!("Stop set to {}%", req.stop)),
             Err(e) => r.push(format!("Stop failed: {}", e)),
         }
-        match fs::write(
-            "/sys/class/power_supply/BAT0/charge_start_threshold",
-            req.start.to_string(),
-        ) {
+        match fs::write(&start_path, req.start.to_string()) {
             Ok(_) => r.push(format!("Start set to {}%", req.start)),
             Err(e) => r.push(format!("Start failed: {}", e)),
         }
@@ -511,11 +519,24 @@ mod tests {
 
     // -- McpServerState defaults --
 
+    /// The MCP server and the OAuth callback listener cannot both bind the same
+    /// port, and the failure is silent: with MCP running, the callback server
+    /// fails to bind and Google login simply never completes. They used to share
+    /// 8765.
+    #[test]
+    fn mcp_port_does_not_collide_with_the_oauth_callback() {
+        assert_ne!(
+            DEFAULT_MCP_PORT,
+            crate::sync::OAUTH_CALLBACK_PORT,
+            "MCP and the OAuth callback would fight over the same port"
+        );
+    }
+
     #[test]
     fn default_state() {
         let state = McpServerState::default();
         assert_eq!(state.host, "127.0.0.1");
-        assert_eq!(state.port, 8765);
+        assert_eq!(state.port, DEFAULT_MCP_PORT);
         assert!(state.cancel_token.is_none());
     }
 
