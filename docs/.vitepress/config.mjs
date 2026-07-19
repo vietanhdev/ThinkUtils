@@ -42,6 +42,7 @@ export default withMermaid(
             text: 'Development',
             items: [
               { text: 'Architecture', link: '/development/architecture' },
+              { text: 'Packaging', link: '/development/packaging' },
               { text: 'CSS Architecture', link: '/development/css' },
               { text: 'Icon Generation', link: '/development/icons' },
               {

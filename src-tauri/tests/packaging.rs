@@ -22,6 +22,17 @@ fn repo_file(rel: &str) -> PathBuf {
     PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/..")).join(rel)
 }
 
+/// Lines that actually do something, with comments stripped.
+///
+/// These files carry long comments explaining the constraints they encode, and
+/// a naive substring search matches the explanation as readily as a violation.
+fn directives(content: &str) -> impl Iterator<Item = &str> {
+    content
+        .lines()
+        .map(str::trim_end)
+        .filter(|l| !l.trim_start().starts_with('#') && !l.trim().is_empty())
+}
+
 fn read(rel: &str) -> String {
     std::fs::read_to_string(repo_file(rel))
         .unwrap_or_else(|e| panic!("missing packaging file {}: {}", rel, e))
@@ -76,7 +87,11 @@ fn each_package_installs_the_helper_where_the_app_looks() {
 /// fails lintian/rpmlint and would be rejected outright.
 #[test]
 fn no_package_writes_to_usr_local() {
-    for f in ["packaging/aur/PKGBUILD", "packaging/copr/thinkutils.spec"] {
+    for f in [
+        "packaging/aur/PKGBUILD",
+        "packaging/copr/thinkutils.spec",
+        "packaging/ppa/debian/rules",
+    ] {
         let content = read(f);
         for line in content.lines() {
             // Comments explain *why* /usr/local is avoided, so only real
@@ -104,7 +119,11 @@ fn packages_ship_the_polkit_rule_under_usr_share() {
         .expect("packaged rule path has a directory")
         .0;
 
-    for f in ["packaging/aur/PKGBUILD", "packaging/copr/thinkutils.spec"] {
+    for f in [
+        "packaging/aur/PKGBUILD",
+        "packaging/copr/thinkutils.spec",
+        "packaging/ppa/debian/rules",
+    ] {
         let content = read(f);
         assert!(
             content.contains("polkit-1/rules.d"),
@@ -158,4 +177,79 @@ fn packaging_versions_match_the_manifest() {
         "spec Version does not match package.json ({})",
         version
     );
+}
+
+/// The Debian package must install the helper where the app searches, exactly
+/// like the other two formats.
+#[test]
+fn debian_rules_installs_the_helper_where_the_app_looks() {
+    let rules = read("packaging/ppa/debian/rules");
+    assert!(
+        rules.contains(HELPER_CANDIDATES[0].trim_start_matches('/')),
+        "debian/rules must install the helper to {}",
+        HELPER_CANDIDATES[0]
+    );
+}
+
+/// Launchpad builders have no network. If debian/rules ever stops passing
+/// --offline, or CARGO_NET_OFFLINE is dropped, the build reaches for crates.io
+/// and fails on the builder while still succeeding locally.
+#[test]
+fn debian_rules_builds_offline() {
+    let rules = read("packaging/ppa/debian/rules");
+    assert!(rules.contains("CARGO_NET_OFFLINE = true"));
+    assert!(rules.contains("--offline"));
+    assert!(
+        rules.contains("--locked"),
+        "--locked keeps the builder from silently resolving a different tree"
+    );
+}
+
+/// dh_clean deletes every *.orig file as patch cruft, which removes cargo's
+/// vendored Cargo.toml.orig files that .cargo-checksum.json references. The
+/// offline build then fails with a checksum error -- on Launchpad only, since a
+/// local build never runs dh_clean. This override is easy to drop and expensive
+/// to rediscover.
+#[test]
+fn debian_rules_protects_vendored_orig_files() {
+    let rules = read("packaging/ppa/debian/rules");
+    assert!(
+        rules.contains("dh_clean -X.orig"),
+        "debian/rules must keep dh_clean from deleting vendored *.orig files"
+    );
+}
+
+/// `tauri build` downloads linuxdeploy and AppImage runtimes at build time,
+/// which cannot work on a network-less builder.
+#[test]
+fn debian_rules_does_not_invoke_the_tauri_bundler() {
+    // Comments explain WHY the bundler is avoided, so only real recipe lines
+    // count -- an earlier version of this test failed on its own rationale.
+    for line in directives(&read("packaging/ppa/debian/rules")) {
+        assert!(
+            !line.contains("tauri build") && !line.contains("npm run tauri"),
+            "debian/rules must build with plain cargo, not the Tauri bundler:\n  {}",
+            line
+        );
+    }
+}
+
+/// The control template must stay a template: a literal Build-Depends here
+/// would silently ship noble the wrong toolchain.
+#[test]
+fn debian_control_is_templated_for_per_series_rust() {
+    let control = read("packaging/ppa/debian/control.in");
+    assert!(control.contains("@RUST_BUILD_DEPS@"));
+    for line in directives(&control) {
+        assert!(
+            !line.contains("librust-"),
+            "dependencies are vendored, so no librust-* packages should be required:\n  {}",
+            line
+        );
+        assert!(
+            !line.contains("npm") && !line.contains("nodejs"),
+            "npm is not a build dependency; adding one would require vendoring node_modules too:\n  {}",
+            line
+        );
+    }
 }
