@@ -4,6 +4,7 @@ pub mod environment;
 mod fan_control;
 mod fan_curve;
 pub mod hardware_root;
+pub mod hwmon;
 mod mcp;
 mod monitor;
 mod performance;

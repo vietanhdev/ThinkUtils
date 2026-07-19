@@ -68,10 +68,30 @@ fn captured_profile_is_present_and_populated() {
 /// wrong on every P-series and X1 Extreme.
 #[test]
 fn dual_fan_thinkpad_reports_two_tachometers_and_one_control_channel() {
-    let tachs = count_matching(P1, |n| n.starts_with("fan") && n.ends_with("_input"));
-    let pwms = count_matching(P1, |n| {
-        n.len() == 4 && n.starts_with("pwm") && n.ends_with(|c: char| c.is_ascii_digit())
-    });
+    // Counted through /sys/class/hwmon, which is what the app walks. The profile
+    // also keeps the resolved /sys/devices paths those symlinks point at, so a
+    // whole-tree count would see every attribute twice.
+    let class = profile_root(P1).join("sys/class/hwmon");
+    let mut tachs = 0;
+    let mut pwms = 0;
+
+    for entry in std::fs::read_dir(&class).expect("class/hwmon present in profile") {
+        let dir = entry.expect("readable entry").path();
+        let name = std::fs::read_to_string(dir.join("name")).unwrap_or_default();
+        if name.trim() != "thinkpad" {
+            continue;
+        }
+        for f in std::fs::read_dir(&dir).expect("readable chip dir") {
+            let file = f.expect("readable entry").file_name();
+            let file = file.to_string_lossy();
+            if file.starts_with("fan") && file.ends_with("_input") {
+                tachs += 1;
+            }
+            if file.len() == 4 && file.starts_with("pwm") {
+                pwms += 1;
+            }
+        }
+    }
 
     assert_eq!(tachs, 2, "expected two tachometers on a P1 Gen 4i");
     assert_eq!(pwms, 1, "expected a single PWM channel driving both fans");

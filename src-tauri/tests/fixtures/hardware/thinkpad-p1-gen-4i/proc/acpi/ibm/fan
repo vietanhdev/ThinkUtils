@@ -1,5 +1,5 @@
 status:		enabled
-speed:		2420
+speed:		3812
 level:		auto
 commands:	level <level> (<level> is 0-7, auto, disengaged, full-speed)
 commands:	enable, disable

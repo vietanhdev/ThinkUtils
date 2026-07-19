@@ -108,7 +108,23 @@ for h in /sys/class/hwmon/hwmon*; do
                 "$real"/temp*_input "$real"/temp*_label "$real"/temp*_crit "$real"/temp*_max; do
         [ -e "$attr" ] && capture "$attr"
     done
-    # Record the symlink mapping; tests need to find chips by name.
+    # Mirror the /sys/class/hwmon view as real directories.
+    #
+    # On a live system these are symlinks into /sys/devices, and capturing only
+    # the resolved target leaves a profile that nothing can discover: code walks
+    # /sys/class/hwmon, which would not exist. Symlinks are not used here either,
+    # since they would point outside the profile at the real machine.
+    class_dir="$DEST/sys/class/hwmon/$(basename "$h")"
+    mkdir -p "$class_dir"
+    for f in "$real"/*; do
+        [ -f "$f" ] || continue
+        base=$(basename "$f")
+        case "$base" in
+            name|fan*|pwm*|temp*) cat "$f" > "$class_dir/$base" 2>/dev/null || true ;;
+        esac
+    done
+
+    # Record the mapping too, so the provenance of each chip stays readable.
     printf '%s -> %s\n' "$h" "$real" >> "$DEST/hwmon-map.txt"
 done
 

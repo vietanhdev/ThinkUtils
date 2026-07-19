@@ -7,5 +7,5 @@
 
 ThinkPad fan interface: present
 fan_control=1 active:   yes
-Tachometers captured:   2
-PWM channels captured:  1
+Tachometers captured:   4
+PWM channels captured:  2

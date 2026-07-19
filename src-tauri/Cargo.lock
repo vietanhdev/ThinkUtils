@@ -4204,7 +4204,6 @@ dependencies = [
  "lazy_static",
  "oauth2",
  "rand 0.8.7",
- "regex",
  "reqwest 0.11.27",
  "rmcp",
  "schemars 0.8.22",

@@ -5,5 +5,5 @@
 /sys/class/hwmon/hwmon4 -> /sys/devices/platform/USBC000:00/power_supply/ucsi-source-psy-USBC000:001/hwmon4
 /sys/class/hwmon/hwmon5 -> /sys/devices/platform/USBC000:00/power_supply/ucsi-source-psy-USBC000:002/hwmon5
 /sys/class/hwmon/hwmon6 -> /sys/devices/platform/thinkpad_hwmon/hwmon/hwmon6
-/sys/class/hwmon/hwmon7 -> /sys/devices/virtual/thermal/thermal_zone9/hwmon7
-/sys/class/hwmon/hwmon8 -> /sys/devices/platform/coretemp.0/hwmon/hwmon8
+/sys/class/hwmon/hwmon7 -> /sys/devices/platform/coretemp.0/hwmon/hwmon7
+/sys/class/hwmon/hwmon8 -> /sys/devices/virtual/thermal/thermal_zone9/hwmon8

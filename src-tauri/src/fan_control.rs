@@ -1,8 +1,6 @@
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::process::Command;
 
 const PROC_FAN: &str = "/proc/acpi/ibm/fan";
 pub const HELPER_PATH: &str = "/usr/local/bin/thinkutils-fan-control";
@@ -306,48 +304,40 @@ pub fn get_sensor_data() -> ApiResponse<SensorData> {
         }
     }
 
-    // Get temperature data from sensors command
-    match Command::new("sensors").arg("thinkpad-isa-0000").output() {
-        Ok(output) => {
-            if output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                // Both patterns are compiled once. rpm_re used to be rebuilt on
-                // every line of `sensors` output, which is the hot path here.
-                let temp_re = Regex::new(r"^(.+?):\s+\+?([0-9.]+°C)").unwrap();
-                let rpm_re = Regex::new(r"(\d+\s*RPM)").unwrap();
+    // Read temperatures and fans from hwmon directly rather than shelling out
+    // to `sensors`. That subprocess needed lm-sensors installed, hardcoded the
+    // chip name thinkpad-isa-0000, and double-counted the first fan: procfs
+    // contributed "Fan1" and `sensors` contributed "fan1", so the UI listed one
+    // fan twice under two names.
+    //
+    // It also could not see the second fan at all on a dual-fan machine --
+    // /proc/acpi/ibm/fan has a speed: field and no speed2:.
+    let readings = crate::hwmon::read_all();
 
-                for line in stdout.lines() {
-                    if let Some(caps) = temp_re.captures(line) {
-                        let label = caps.get(1).unwrap().as_str().trim();
-                        let value = caps.get(2).unwrap().as_str();
-                        let label_lower = label.to_lowercase();
-                        if label_lower.contains("cpu") || label_lower.contains("gpu") {
-                            temps.insert(label.to_string(), value.to_string());
-                        }
-                    }
+    // procfs already supplied the primary fan's speed. hwmon supplies every fan
+    // including that one, so the procfs entry is dropped in favour of the
+    // complete set rather than merged with it.
+    fans.remove("Fan1");
+    for tach in &readings.tachometers {
+        fans.insert(tach.label.clone(), format!("{} RPM", tach.rpm));
+    }
 
-                    if line.starts_with("fan") && line.contains("RPM") {
-                        if let Some((label, rest)) = line.split_once(':') {
-                            let label = label.trim();
-                            if let Some(rpm_match) = rpm_re.find(rest) {
-                                fans.insert(label.to_string(), rpm_match.as_str().to_string());
-                            }
-                        }
-                    }
-                }
-            } else {
-                temps.insert(
-                    "Info".to_string(),
-                    "Install lm-sensors for temperature data".to_string(),
-                );
-            }
+    for temp in &readings.temperatures {
+        let label_lower = temp.label.to_lowercase();
+        if label_lower.contains("cpu")
+            || label_lower.contains("gpu")
+            || label_lower.contains("package")
+            || label_lower.contains("core")
+        {
+            temps.insert(temp.label.clone(), format!("{:.1}°C", temp.celsius));
         }
-        Err(_) => {
-            temps.insert(
-                "Info".to_string(),
-                "Install lm-sensors: sudo apt install lm-sensors".to_string(),
-            );
-        }
+    }
+
+    if temps.is_empty() {
+        temps.insert(
+            "Info".to_string(),
+            "No CPU temperature sensors found on this machine.".to_string(),
+        );
     }
 
     ApiResponse {
@@ -663,7 +653,7 @@ commands:\twatchdog <timeout> (0 disables, timeout is 0-120)
         f.write_all(HELPER_SCRIPT.as_bytes()).expect("write helper");
         drop(f);
 
-        let out = Command::new("bash")
+        let out = std::process::Command::new("bash")
             .arg(&path)
             .arg(arg)
             .output()
