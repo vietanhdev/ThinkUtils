@@ -1,6 +1,29 @@
 // Main Application Entry Point
 console.log('[ThinkUtils] Script loaded');
 
+// Report uncaught frontend errors to the backend so they reach the process log.
+//
+// This is registered before any other import runs, because an exception thrown
+// during module evaluation is exactly the case that would otherwise vanish. A
+// view dying on an absent sysfs path leaves the sidebar painted and the process
+// alive, so nothing outside the browser console would ever notice.
+const reportError = (message) => {
+  try {
+    window.__TAURI__?.core?.invoke('report_frontend_error', {
+      msg: String(message).slice(0, 500)
+    });
+  } catch {
+    // Reporting must never itself throw and take down init.
+  }
+};
+
+window.addEventListener('error', (e) => {
+  reportError(`${e.message} @ ${e.filename}:${e.lineno}`);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  reportError(`unhandled rejection: ${e.reason}`);
+});
+
 import { initializeElements } from './dom.js';
 import { setupTitlebar } from './titlebar.js';
 import { setupFeatureNavigation } from './navigation.js';
@@ -99,12 +122,15 @@ function setupPermissionDialog() {
 async function initializeApp() {
   console.log('[ThinkUtils] Initializing...');
 
+  let loadedTemplateCount = 0;
+
   // If using modular HTML, load templates first
   if (isModularMode()) {
     console.log('[ThinkUtils] Modular mode detected, loading templates...');
     try {
       const templates = await loadTemplates();
       injectTemplates(templates);
+      loadedTemplateCount = Object.keys(templates).length;
     } catch (error) {
       console.error('[ThinkUtils] Failed to load templates:', error);
       // Continue anyway - app might still work with inline HTML
@@ -142,6 +168,18 @@ async function initializeApp() {
   }, 2000);
 
   console.log('[ThinkUtils] Ready');
+
+  // Signal that init actually completed. A headless test can see a fully painted
+  // window from a frontend that died halfway through, so reaching this line is
+  // the only proof the boot sequence finished.
+  try {
+    await window.__TAURI__?.core?.invoke('report_frontend_ready', {
+      templates: loadedTemplateCount,
+      views: document.querySelectorAll('#views-container > *').length
+    });
+  } catch (error) {
+    console.error('[ThinkUtils] Could not report ready state:', error);
+  }
 }
 
 window.addEventListener('DOMContentLoaded', initializeApp);

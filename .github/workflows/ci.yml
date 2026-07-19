@@ -301,6 +301,64 @@ jobs:
         working-directory: src-tauri
         run: cargo test --test hardware_profiles
 
+  # Everything above proves the code COMPILES and LINTS. Not one job has ever
+  # started the application. A Tauri binary can pass every check in this file and
+  # still die on launch with a dlopen panic for a library the .deb forgot to
+  # depend on, or come up showing an empty window because the frontend never
+  # mounted. The only assertion that catches that is installing the real package
+  # and looking at the real pixels.
+  #
+  # It runs in a container with no ThinkPad hardware, which is the point: it
+  # proves the app starts, renders its full UI, and degrades cleanly when
+  # /proc/acpi/ibm/fan is absent -- the environment a bug is most likely to hide
+  # in. See the header of the script for how it tells those states apart.
+  gui-launch:
+    needs: [rust, frontend]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Tauri build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf build-essential file libssl-dev rpm
+
+      - run: npm ci
+
+      # Built here rather than downloaded, so a PR is tested before anything is
+      # ever published.
+      - name: Build the real packages
+        run: npm run tauri build
+
+      - name: List what was built
+        run: find src-tauri/target/release/bundle -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' \) -print
+
+      - name: Launch-test the packages in clean containers
+        run: scripts/test-gui-packages-docker.sh
+
+      # A red run should come with the actual picture of the broken window, not
+      # just whatever reached stdout before the container was discarded.
+      - name: Upload screenshots, OCR text and app logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-launch-evidence
+          path: build/gui-test-out/
+          if-no-files-found: warn
+          retention-days: 14
+
   # A full VitePress production build, not a link check. VitePress compiles every
   # page as a Vue SFC, so a literal {{ }} in prose parses as an interpolation and
   # fails the build - and only the production build catches it.

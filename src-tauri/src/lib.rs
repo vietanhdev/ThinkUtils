@@ -79,6 +79,29 @@ async fn start_drag(app: AppHandle) -> Result<(), String> {
     }
 }
 
+/// Called by the frontend once every template is injected and every view has
+/// initialised.
+///
+/// Its absence in a log means the JS never finished booting, which no pixel
+/// check can prove on its own — a window can be fully painted by a frontend
+/// that died halfway through init.
+#[tauri::command]
+fn report_frontend_ready(templates: usize, views: usize) {
+    println!("[thinkutils] frontend ready: templates={templates} views={views}");
+}
+
+/// Any uncaught frontend exception or rejection.
+///
+/// This is the check that catches a view dying on an absent sysfs path: the
+/// sidebar still paints, the process still lives, and without this line nothing
+/// would ever notice.
+#[tauri::command]
+fn report_frontend_error(msg: String) {
+    // Truncated because an unhandled rejection can carry an entire stack.
+    let msg: String = msg.chars().take(500).collect();
+    eprintln!("[thinkutils] frontend error: {msg}");
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -93,6 +116,52 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .setup(|app| {
+            // --- Diagnostic instrumentation ---
+            //
+            // These lines are the contract scripts/test-gui-packages-docker.sh
+            // asserts against. In a headless container they are the only evidence
+            // that the app started correctly, so do not remove or reword them
+            // without updating that script. Format: "[thinkutils] <key>: <value>".
+            if let Some(w) = app.get_webview_window("main") {
+                match w.url() {
+                    // An http(s) URL here means the build points at devUrl, which
+                    // renders an empty window on any machine without a dev server.
+                    Ok(url) => println!("[thinkutils] webview url: {url}"),
+                    Err(e) => eprintln!("[thinkutils] warning: could not read webview url: {e}"),
+                }
+            }
+
+            // Probe the hardware surfaces this app depends on, and say so. In a
+            // container every one is absent, and that is a legitimate supported
+            // state -- not a failure. Printing it is what lets a test tell
+            // "started fine, no ThinkPad here" from "broken", which are otherwise
+            // indistinguishable from the outside.
+            let present = |p: &str| {
+                if std::path::Path::new(p).exists() {
+                    "present"
+                } else {
+                    "absent"
+                }
+            };
+            let ibm_fan = present("/proc/acpi/ibm/fan");
+            let bat0 = present("/sys/class/power_supply/BAT0");
+            let cpufreq = present("/sys/devices/system/cpu/cpu0/cpufreq");
+            println!("[thinkutils] hw probe: ibm_fan={ibm_fan} bat0={bat0} cpufreq={cpufreq}");
+
+            // Only the thinkpad_acpi fan interface distinguishes a supported
+            // machine. A battery and cpufreq exist on every Linux laptop, and a
+            // container inherits the host's /sys -- so keying the mode off those
+            // reported full ThinkPad support from inside a container that had no
+            // fan interface at all. The first run of the launch test caught it.
+            println!(
+                "[thinkutils] hw mode: {}",
+                if ibm_fan == "present" {
+                    "full"
+                } else {
+                    "degraded"
+                }
+            );
+
             // Load fan curve config from persistent storage
             let saved_config = fan_curve::load_config_from_store(app.handle());
             let fan_curve_state =
@@ -194,6 +263,8 @@ pub fn run() {
             fan_control::get_sensor_data,
             fan_control::get_fan_capability,
             environment::get_system_report,
+            report_frontend_ready,
+            report_frontend_error,
             fan_control::enable_fan_control,
             fan_control::set_fan_speed,
             fan_control::check_permissions,
