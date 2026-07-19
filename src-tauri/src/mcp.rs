@@ -1,5 +1,8 @@
-use rmcp::transport::sse_server::SseServer;
-use rmcp::{model::ServerInfo, schemars, tool, ServerHandler, ServiceExt};
+use rmcp::handler::server::wrapper::Parameters;
+use rmcp::model::ServerInfo;
+use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
+use rmcp::transport::streamable_http_server::{StreamableHttpServerConfig, StreamableHttpService};
+use rmcp::{schemars, tool, tool_handler, tool_router, ServerHandler};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::net::SocketAddr;
@@ -105,7 +108,7 @@ pub struct SetBatteryThresholdsRequest {
 #[derive(Debug, Clone)]
 struct ThinkUtilsHandler;
 
-#[tool(tool_box)]
+#[tool_router]
 impl ThinkUtilsHandler {
     #[tool(description = "Get ThinkPad fan status: speed (RPM), level, and status")]
     fn get_fan_status(&self) -> String {
@@ -115,7 +118,7 @@ impl ThinkUtilsHandler {
     #[tool(
         description = "Set ThinkPad fan speed. Values: 'auto', 'full-speed', or '0' through '7'"
     )]
-    fn set_fan_speed(&self, #[tool(aggr)] req: SetFanSpeedRequest) -> String {
+    fn set_fan_speed(&self, Parameters(req): Parameters<SetFanSpeedRequest>) -> String {
         if let Some(err) = validate_fan_speed(&req.speed) {
             return err;
         }
@@ -171,7 +174,10 @@ impl ThinkUtilsHandler {
     }
 
     #[tool(description = "Set battery charge thresholds (start and stop percentages)")]
-    fn set_battery_thresholds(&self, #[tool(aggr)] req: SetBatteryThresholdsRequest) -> String {
+    fn set_battery_thresholds(
+        &self,
+        Parameters(req): Parameters<SetBatteryThresholdsRequest>,
+    ) -> String {
         if let Some(err) = validate_battery_thresholds(req.start, req.stop) {
             return err;
         }
@@ -268,15 +274,60 @@ impl ThinkUtilsHandler {
     }
 }
 
-#[tool(tool_box)]
+/// Hosts this server accepts in an inbound `Host` header.
+///
+/// rmcp defaults to loopback, which is what closes DNS rebinding. Naming the
+/// port-qualified forms too, because a browser sends `Host: 127.0.0.1:8779`.
+fn allowed_hosts(port: u16) -> Vec<String> {
+    vec![
+        "localhost".to_string(),
+        format!("localhost:{}", port),
+        "127.0.0.1".to_string(),
+        format!("127.0.0.1:{}", port),
+    ]
+}
+
+/// Browser origins this server accepts.
+///
+/// rmcp leaves `allowed_origins` EMPTY by default, and empty means Origin
+/// validation is disabled entirely -- so this has to be set explicitly or the
+/// cross-origin hole stays open. A Host check alone is not enough: a page can
+/// fetch the loopback endpoint with mode:'no-cors', the Host header matches
+/// because the request really is going to 127.0.0.1, and only the Origin reveals
+/// that another site initiated it.
+///
+/// Listing only our own origins means a genuine MCP client -- which is not a
+/// browser and sends no Origin at all -- still works, while anything originating
+/// in a browser tab is rejected unless it is truly same-origin.
+fn allowed_origins(port: u16) -> Vec<String> {
+    vec![
+        format!("http://127.0.0.1:{}", port),
+        format!("http://localhost:{}", port),
+    ]
+}
+
+fn build_http_config(port: u16, ct: CancellationToken) -> StreamableHttpServerConfig {
+    StreamableHttpServerConfig::default()
+        .with_cancellation_token(ct)
+        .with_allowed_hosts(allowed_hosts(port))
+        .with_allowed_origins(allowed_origins(port))
+}
+
+/// Written out rather than relying on `#[tool_router(server_handler)]`, which
+/// generates a default ServerHandler and would silently drop the instructions
+/// the client shows to its model.
+#[tool_handler]
 impl ServerHandler for ThinkUtilsHandler {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo {
-            instructions: Some(
-                "ThinkUtils MCP Server - Monitor and control ThinkPad hardware".into(),
-            ),
-            ..Default::default()
-        }
+        // ServerInfo is non-exhaustive in rmcp 2, so build from Default and set
+        // the one field we care about.
+        let mut info = ServerInfo::default();
+        info.instructions = Some(
+            "ThinkUtils MCP Server - monitor and control ThinkPad hardware: fan speed and \
+             status, CPU temperature and governor, battery info and charge thresholds."
+                .into(),
+        );
+        info
     }
 }
 
@@ -337,42 +388,52 @@ pub async fn start_mcp_server(
     let ct = CancellationToken::new();
     let ct_clone = ct.clone();
 
-    // Start the SSE server in a background task
-    tokio::spawn(async move {
-        println!("[MCP] Starting SSE server on http://{}/sse", addr);
+    let config = build_http_config(port, ct_clone.clone());
 
-        let sse_config = rmcp::transport::sse_server::SseServerConfig {
-            bind: addr,
-            sse_path: "/sse".to_string(),
-            post_path: "/message".to_string(),
-            ct: ct_clone.clone(),
+    // Host and Origin allowlists. This is the whole reason for moving to rmcp 2:
+    // 0.1.5's SSE server built its router internally and exposed no seam to add
+    // either check, so a page the user visited could POST to loopback and invoke
+    // tools.
+    //
+    // allowed_hosts defaults to loopback and closes DNS rebinding. allowed_origins
+    // defaults to EMPTY, which DISABLES Origin validation entirely -- so it has to
+    // be set explicitly. A Host check alone is not enough: a browser can fetch the
+    // loopback endpoint with mode:'no-cors', the Host header matches, and only the
+    // Origin reveals that the request came from another site.
+    //
+    // Listing just our own origins means a real MCP client (which sends no Origin
+    // at all) still works, while anything originating in a browser tab is rejected
+    // unless it is genuinely same-origin.
+
+    tokio::spawn(async move {
+        println!(
+            "[MCP] Starting Streamable HTTP server on http://{}/mcp",
+            addr
+        );
+
+        let service = StreamableHttpService::new(
+            || Ok(ThinkUtilsHandler),
+            Arc::new(LocalSessionManager::default()),
+            config,
+        );
+
+        let router = axum::Router::new().nest_service("/mcp", service);
+
+        let listener = match tokio::net::TcpListener::bind(addr).await {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("[MCP] Failed to bind {}: {}", addr, e);
+                return;
+            }
         };
 
-        match SseServer::serve_with_config(sse_config).await {
-            Ok(mut server) => loop {
-                tokio::select! {
-                    _ = ct_clone.cancelled() => {
-                        println!("[MCP] Server stopped");
-                        break;
-                    }
-                    transport = server.next_transport() => {
-                        match transport {
-                            Some(t) => {
-                                let handler = ThinkUtilsHandler;
-                                tokio::spawn(async move {
-                                    if let Ok(svc) = handler.serve(t).await {
-                                        let _ = svc.waiting().await;
-                                    }
-                                });
-                            }
-                            None => break,
-                        }
-                    }
-                }
-            },
-            Err(e) => {
-                eprintln!("[MCP] Failed to start: {}", e);
-            }
+        let server = axum::serve(listener, router).with_graceful_shutdown(async move {
+            ct_clone.cancelled().await;
+            println!("[MCP] Server stopped");
+        });
+
+        if let Err(e) = server.await {
+            eprintln!("[MCP] Server error: {}", e);
         }
     });
 
@@ -384,7 +445,7 @@ pub async fn start_mcp_server(
     Ok(ApiResponse {
         success: true,
         data: Some(format!(
-            "MCP server running on http://{}:{}/sse",
+            "MCP server running on http://{}:{}/mcp",
             host, port
         )),
         error: None,
@@ -417,6 +478,84 @@ pub async fn stop_mcp_server(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // -- Host and Origin allowlists (the point of the rmcp 2 migration) --
+
+    /// Any port; the allowlists are built from whatever the server binds.
+    const TEST_PORT: u16 = 8779;
+
+    /// A browser sends `Host: 127.0.0.1:8779`, not a bare `127.0.0.1`, so the
+    /// port-qualified forms must be listed or every real request is rejected.
+    #[test]
+    fn allowed_hosts_cover_the_port_qualified_forms() {
+        let hosts = allowed_hosts(TEST_PORT);
+        for expected in [
+            "localhost".to_string(),
+            format!("localhost:{}", TEST_PORT),
+            "127.0.0.1".to_string(),
+            format!("127.0.0.1:{}", TEST_PORT),
+        ] {
+            assert!(hosts.contains(&expected), "missing host {}", expected);
+        }
+    }
+
+    /// Loopback only. A routable host here would reintroduce the exposure that
+    /// validate_mcp_host already refuses at bind time.
+    #[test]
+    fn allowed_hosts_are_loopback_only() {
+        for host in allowed_hosts(TEST_PORT) {
+            let bare = host.split(':').next().unwrap_or(&host).to_string();
+            assert!(
+                bare == "localhost" || bare == "127.0.0.1" || bare == "::1",
+                "{} is not a loopback host",
+                host
+            );
+        }
+    }
+
+    /// rmcp leaves allowed_origins empty by default, and empty DISABLES Origin
+    /// validation entirely. If this list is ever emptied, a page the user visits
+    /// can reach the server on loopback again -- the Host header matches, because
+    /// the request really is going to 127.0.0.1. Only the Origin gives it away.
+    #[test]
+    fn allowed_origins_is_never_empty() {
+        assert!(
+            !allowed_origins(TEST_PORT).is_empty(),
+            "an empty allowed_origins turns Origin validation OFF"
+        );
+    }
+
+    /// rmcp matches per RFC 6454 on (scheme, host, port), so a schemeless entry
+    /// silently matches nothing.
+    #[test]
+    fn allowed_origins_carry_a_scheme_and_the_right_port() {
+        for origin in allowed_origins(TEST_PORT) {
+            assert!(origin.starts_with("http://"), "{} has no scheme", origin);
+            assert!(
+                origin.ends_with(&format!(":{}", TEST_PORT)),
+                "{} does not name the server port",
+                origin
+            );
+        }
+    }
+
+    /// The threat this closes: a page on another site fetching loopback.
+    #[test]
+    fn a_foreign_origin_is_not_allowed() {
+        let origins = allowed_origins(TEST_PORT);
+        for hostile in [
+            "https://evil.example".to_string(),
+            "http://evil.example".to_string(),
+            "null".to_string(),
+            format!("http://evil.example:{}", TEST_PORT),
+        ] {
+            assert!(
+                !origins.contains(&hostile),
+                "{} must not be allowed",
+                hostile
+            );
+        }
+    }
 
     // -- Fan speed validation --
 
