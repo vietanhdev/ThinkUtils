@@ -8,8 +8,6 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
-const HELPER_PATH: &str = "/usr/local/bin/thinkutils-fan-control";
-
 const VALID_FAN_SPEEDS: &[&str] = &["auto", "full-speed", "0", "1", "2", "3", "4", "5", "6", "7"];
 
 fn validate_fan_speed(speed: &str) -> Option<String> {
@@ -125,12 +123,8 @@ impl ThinkUtilsHandler {
         if fs::write("/proc/acpi/ibm/fan", &command).is_ok() {
             return format!("Fan speed set to: {}", req.speed);
         }
-        if std::path::Path::new(HELPER_PATH).exists() {
-            match Command::new("pkexec")
-                .arg(HELPER_PATH)
-                .arg(&command)
-                .output()
-            {
+        if let Some(helper) = crate::fan_control::helper_path() {
+            match Command::new("pkexec").arg(helper).arg(&command).output() {
                 Ok(o) if o.status.success() => return format!("Fan speed set to: {}", req.speed),
                 Ok(o) => return format!("Failed: {}", String::from_utf8_lossy(&o.stderr)),
                 Err(e) => return format!("Error: {}", e),

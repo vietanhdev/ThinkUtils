@@ -1,0 +1,23 @@
+/* ThinkUtils: passwordless fan control via the dedicated helper only.
+ *
+ * Generated from HELPER_CANDIDATES -- do not edit by hand. The helper accepts
+ * fan level commands and nothing else, so this grants exactly that and no
+ * general privilege.
+ */
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.policykit.exec") {
+        var program = action.lookup("program");
+        if (
+            program == "/usr/lib/thinkutils/thinkutils-fan-control" ||
+            program == "/usr/libexec/thinkutils/thinkutils-fan-control" ||
+            program == "/usr/local/bin/thinkutils-fan-control"
+        ) {
+            /* Local, active sessions only: an SSH session must not inherit
+               passwordless hardware control. */
+            if (subject.local && subject.active &&
+                (subject.isInGroup("wheel") || subject.isInGroup("sudo"))) {
+                return polkit.Result.YES;
+            }
+        }
+    }
+});

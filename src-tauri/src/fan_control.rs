@@ -5,11 +5,57 @@ use std::fs;
 use std::process::Command;
 
 const PROC_FAN: &str = "/proc/acpi/ibm/fan";
-pub const HELPER_PATH: &str = "/usr/local/bin/thinkutils-fan-control";
+
+/// Where the privileged helper may live, in the order it is searched.
+///
+/// A distro package ships it at one of the first two paths, both of which are
+/// root-owned and package-managed. `/usr/local` is reserved for the local
+/// administrator — Debian Policy §9.1.2 and the Fedora guidelines both forbid a
+/// package writing there — so it appears only as the legacy location used by the
+/// app's own installer, kept so existing installs keep working.
+pub const HELPER_CANDIDATES: &[&str] = &[
+    // Debian and Arch convention for an internal helper not on $PATH.
+    "/usr/lib/thinkutils/thinkutils-fan-control",
+    // Fedora convention (%{_libexecdir}).
+    "/usr/libexec/thinkutils/thinkutils-fan-control",
+    // Legacy: written at runtime by setup_permissions() on a non-packaged install.
+    "/usr/local/bin/thinkutils-fan-control",
+];
+
+/// Where `setup_permissions()` writes the helper when the app installs its own.
+///
+/// Only used when no packaged helper is present — a package-owned file must
+/// never be overwritten at runtime.
+pub const HELPER_SELF_INSTALL_PATH: &str = "/usr/local/bin/thinkutils-fan-control";
+
+/// The first helper that actually exists, if any.
+pub fn helper_path() -> Option<&'static str> {
+    HELPER_CANDIDATES
+        .iter()
+        .copied()
+        .find(|p| std::path::Path::new(p).exists())
+}
+
+/// Whether the helper came from a distro package.
+///
+/// When true the app must not install, overwrite, or offer to reinstall it: those
+/// files belong to dpkg/rpm/pacman, and rewriting them puts the package database
+/// out of sync with the filesystem.
+pub fn helper_is_packaged() -> bool {
+    HELPER_CANDIDATES
+        .iter()
+        .take(2)
+        .any(|p| std::path::Path::new(p).exists())
+}
+
+/// Vendor-supplied polkit rules belong under /usr/share; /etc is the
+/// administrator's namespace. A package writing to /etc/polkit-1/rules.d shadows
+/// the admin's own rules and is never cleaned up on uninstall.
 pub const POLKIT_RULE_PATH: &str = "/etc/polkit-1/rules.d/50-thinkutils.rules";
+pub const POLKIT_RULE_PACKAGED_PATH: &str = "/usr/share/polkit-1/rules.d/50-thinkutils.rules";
 
 /// Dedicated fan control helper script - validates input before writing to fan.
-/// Installed at HELPER_PATH by setup_permissions().
+/// Installed at one of HELPER_CANDIDATES.
 pub const HELPER_SCRIPT: &str = r#"#!/bin/bash
 set -e
 FAN="/proc/acpi/ibm/fan"
@@ -33,20 +79,51 @@ esac
 /// Must stay in sync with the literal in HELPER_SCRIPT above; a test asserts it.
 pub const FAN_WATCHDOG_SECS: u32 = 30;
 
-/// Polkit rule that only allows the dedicated helper script without password.
-/// Much tighter than allowing arbitrary bash execution.
-pub const POLKIT_RULE: &str = r#"/* ThinkUtils: Allow passwordless fan control via dedicated helper only */
-polkit.addRule(function(action, subject) {
-    if (action.id == "org.freedesktop.policykit.exec") {
+/// Build the polkit rule granting passwordless exec to the helper, and nothing
+/// else.
+///
+/// Generated from HELPER_CANDIDATES rather than written out, because the path
+/// used to be duplicated in the rule text and in the constant — and a rule
+/// naming a path the helper is not installed at grants nothing while looking
+/// correct.
+///
+/// `subject.local && subject.active` is deliberate: without it, any SSH session
+/// belonging to a wheel/sudo user gets passwordless root-adjacent exec, as does
+/// a backgrounded session the user has switched away from. Fan control is a
+/// physical-console concern.
+pub fn polkit_rule() -> String {
+    let allowed = HELPER_CANDIDATES
+        .iter()
+        .map(|p| format!("            program == \"{}\"", p))
+        .collect::<Vec<_>>()
+        .join(" ||\n");
+
+    format!(
+        r#"/* ThinkUtils: passwordless fan control via the dedicated helper only.
+ *
+ * Generated from HELPER_CANDIDATES -- do not edit by hand. The helper accepts
+ * fan level commands and nothing else, so this grants exactly that and no
+ * general privilege.
+ */
+polkit.addRule(function(action, subject) {{
+    if (action.id == "org.freedesktop.policykit.exec") {{
         var program = action.lookup("program");
-        if (program == "/usr/local/bin/thinkutils-fan-control") {
-            if (subject.isInGroup("wheel") || subject.isInGroup("sudo")) {
+        if (
+{}
+        ) {{
+            /* Local, active sessions only: an SSH session must not inherit
+               passwordless hardware control. */
+            if (subject.local && subject.active &&
+                (subject.isInGroup("wheel") || subject.isInGroup("sudo"))) {{
                 return polkit.Result.YES;
-            }
-        }
-    }
-});
-"#;
+            }}
+        }}
+    }}
+}});
+"#,
+        allowed
+    )
+}
 
 /// Valid fan speed values (whitelist)
 const VALID_SPEEDS: &[&str] = &["auto", "full-speed", "0", "1", "2", "3", "4", "5", "6", "7"];
@@ -412,9 +489,9 @@ pub async fn set_fan_speed(speed: String) -> ApiResponse<String> {
     println!("[Fan] Need elevated permissions");
 
     // 2. Use dedicated helper if installed (passwordless via polkit rule)
-    if std::path::Path::new(HELPER_PATH).exists() {
+    if let Some(helper) = helper_path() {
         match tokio::process::Command::new("pkexec")
-            .arg(HELPER_PATH)
+            .arg(helper)
             .arg(&command_str)
             .output()
             .await
@@ -504,7 +581,7 @@ pub fn check_permissions() -> ApiResponse<bool> {
     // Check if the dedicated helper is installed (installed alongside the polkit rule).
     // We only check the helper because /etc/polkit-1/rules.d/ is root-only,
     // so Path::exists() on the polkit rule always fails for normal users.
-    let helper_installed = std::path::Path::new(HELPER_PATH).exists();
+    let helper_installed = helper_path().is_some();
 
     let has_permission = direct_write || helper_installed;
 
@@ -753,35 +830,40 @@ commands:\twatchdog <timeout> (0 disables, timeout is 0-120)
         }
     }
 
-    /// The polkit rule grants passwordless root. It must name the helper binary and
-    /// nothing else -- granting a shell would make the tight helper pointless.
+    /// The polkit rule grants passwordless root. It must name the helper binaries
+    /// and nothing else -- granting a shell would make the tight helper pointless.
     #[test]
-    fn polkit_rule_grants_only_the_helper_binary() {
-        assert!(
-            POLKIT_RULE.contains(HELPER_PATH),
-            "polkit rule must reference the helper path"
-        );
+    fn polkit_rule_grants_only_the_helper_binaries() {
+        let rule = polkit_rule();
+        for candidate in HELPER_CANDIDATES {
+            assert!(
+                rule.contains(candidate),
+                "polkit rule must cover {}",
+                candidate
+            );
+        }
         for forbidden in ["/bin/bash", "/bin/sh", "/usr/bin/bash", "/usr/bin/env"] {
             assert!(
-                !POLKIT_RULE.contains(forbidden),
+                !rule.contains(forbidden),
                 "polkit rule must not grant {}",
                 forbidden
             );
         }
     }
 
-    /// The helper is written into a root-owned path by the setup script. If the
-    /// constant ever drifted to a user-writable location, any local user could
-    /// replace the binary that polkit grants passwordless root to.
+    /// Without local+active, any SSH session belonging to a wheel/sudo user
+    /// inherits passwordless hardware control, as does a background session the
+    /// user has switched away from.
     #[test]
-    fn helper_path_is_not_user_writable_location() {
-        assert!(HELPER_PATH.starts_with("/usr/local/bin/") || HELPER_PATH.starts_with("/usr/bin/"));
-        for bad in ["/tmp/", "/var/tmp/", "/home/", "/dev/shm/"] {
-            assert!(
-                !HELPER_PATH.starts_with(bad),
-                "helper must not live in {}",
-                bad
-            );
-        }
+    fn polkit_rule_requires_a_local_active_session() {
+        let rule = polkit_rule();
+        assert!(
+            rule.contains("subject.local"),
+            "rule must require a local session"
+        );
+        assert!(
+            rule.contains("subject.active"),
+            "rule must require an active session"
+        );
     }
 }

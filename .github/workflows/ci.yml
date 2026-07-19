@@ -31,30 +31,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Check the four version declarations agree
-        run: |
-          set -euo pipefail
-          pkg=$(jq -r .version package.json)
-          lock=$(jq -r .version package-lock.json)
-          lockpkg=$(jq -r '.packages."".version' package-lock.json)
-          cargo=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -1)
-          tauri=$(jq -r .version src-tauri/tauri.conf.json)
-
-          printf 'package.json             : %s\n' "$pkg"
-          printf 'package-lock.json (top)  : %s\n' "$lock"
-          printf 'package-lock.json (pkgs) : %s\n' "$lockpkg"
-          printf 'src-tauri/Cargo.toml     : %s\n' "$cargo"
-          printf 'src-tauri/tauri.conf.json: %s\n' "$tauri"
-
-          fail=0
-          for v in "$lock" "$lockpkg" "$cargo" "$tauri"; do
-            [ "$v" = "$pkg" ] || fail=1
-          done
-          if [ "$fail" = "1" ]; then
-            echo "::error::version declarations disagree - see CLAUDE.md 'Version Bumping'"
-            exit 1
-          fi
-          echo "OK: all version declarations agree at $pkg"
+      # One script owns the list, so adding a packaging file cannot leave CI
+      # checking a stale subset of it.
+      - name: Check every version declaration agrees
+        run: ./scripts/bump-version.sh --check
 
   # Runs exactly what husky's pre-commit hook runs. That hook only sees STAGED
   # files, on machines that ran npm install - a convenience, not a gate.

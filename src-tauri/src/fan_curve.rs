@@ -221,8 +221,6 @@ fn get_cpu_temperature() -> Result<i32, String> {
     Err("Could not read CPU temperature".to_string())
 }
 
-const HELPER_PATH: &str = "/usr/local/bin/thinkutils-fan-control";
-
 /// How long the firmware watchdog waits before forcing the fan back to auto.
 ///
 /// Shared with the helper script's whitelist, which only accepts this exact
@@ -270,9 +268,9 @@ pub fn restore_fan_to_auto_blocking() {
         }
     }
 
-    if std::path::Path::new(HELPER_PATH).exists() {
+    if let Some(helper) = crate::fan_control::helper_path() {
         match std::process::Command::new("pkexec")
-            .arg(HELPER_PATH)
+            .arg(helper)
             .arg("level auto")
             .output()
         {
@@ -314,12 +312,12 @@ async fn write_fan_command(command: &str) -> Result<(), String> {
 
     // Use dedicated helper if installed (polkit rule grants passwordless access).
     // We only check the helper because /etc/polkit-1/rules.d/ is root-only.
-    if !std::path::Path::new(HELPER_PATH).exists() {
+    let Some(helper) = crate::fan_control::helper_path() else {
         return Err("No write permission. Grant permissions to enable fan curve mode.".to_string());
-    }
+    };
 
     let output = tokio::process::Command::new("pkexec")
-        .arg(HELPER_PATH)
+        .arg(helper)
         .arg(command)
         .output()
         .await

@@ -1,7 +1,7 @@
 mod auth;
 mod battery;
 pub mod environment;
-mod fan_control;
+pub mod fan_control;
 mod fan_curve;
 pub mod hardware_root;
 mod mcp;
