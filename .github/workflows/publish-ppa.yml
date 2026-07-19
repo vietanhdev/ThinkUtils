@@ -1,0 +1,134 @@
+name: Publish to PPA
+
+# workflow_dispatch only, and this one matters most: a Launchpad upload CANNOT
+# be undone. A version can be superseded, never deleted. dry_run defaults to
+# true for that reason.
+on:
+  workflow_dispatch:
+    inputs:
+      series:
+        description: "Ubuntu series, space separated"
+        default: "noble resolute stonking"
+      ppa_rev:
+        description: "PPA revision (bump when re-uploading the same upstream version)"
+        default: "1"
+      dry_run:
+        description: "Build the source packages but do not upload"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # build-ppa-source.sh uses `git archive HEAD`, which needs real history
+          # rather than a shallow clone.
+          fetch-depth: 0
+
+      - name: Install build tooling
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            devscripts dput debhelper dpkg-dev build-essential \
+            cargo rustc pkg-config xz-utils jq \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev libssl-dev
+
+      - name: Version must match the manifests
+        run: ./scripts/bump-version.sh --check
+
+      # gpg.conf, not a command-line argument: dpkg-buildpackage invokes gpg
+      # itself with no passphrase argument, so the passphrase has to be
+      # discoverable from configuration. The gpg-agent preset approach does NOT
+      # work here -- pinentry-mode loopback bypasses the agent entirely, so the
+      # preset is never consulted and signing fails headless.
+      - name: Import the signing key
+        if: ${{ !inputs.dry_run }}
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.LAUNCHPAD_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.LAUNCHPAD_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GPG_PRIVATE_KEY:-}" ]; then
+            echo "::error::LAUNCHPAD_GPG_PRIVATE_KEY is not set"
+            exit 1
+          fi
+
+          export GNUPGHOME="$(mktemp -d)"
+          chmod 700 "$GNUPGHOME"
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+
+          printf '%s' "${GPG_PASSPHRASE:-}" > "$GNUPGHOME/passphrase"
+          chmod 600 "$GNUPGHOME/passphrase"
+          {
+            echo "pinentry-mode loopback"
+            echo "passphrase-file $GNUPGHOME/passphrase"
+            echo "batch"
+          } > "$GNUPGHOME/gpg.conf"
+          printf 'allow-loopback-pinentry\n' > "$GNUPGHOME/gpg-agent.conf"
+
+          printf '%s\n' "$GPG_PRIVATE_KEY" | gpg --batch --import
+
+          keyid=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/ {print $5; exit}')
+          [ -n "$keyid" ] || { echo "::error::no secret key after import"; exit 1; }
+          echo "SIGN_KEY=$keyid" >> "$GITHUB_ENV"
+
+          # Fail here rather than after a full source build if signing is broken.
+          echo test | gpg --clearsign > /dev/null
+          echo "OK: signing works with key $keyid"
+
+      - name: Build the source packages
+        run: |
+          set -euo pipefail
+          args=()
+          for s in ${{ inputs.series }}; do args+=(--series "$s"); done
+          args+=(--ppa-rev "${{ inputs.ppa_rev }}")
+
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            args+=(--no-sign)
+          else
+            args+=(--sign-key "${SIGN_KEY}")
+          fi
+
+          ./scripts/build-ppa-source.sh "${args[@]}"
+
+      - name: Inspect what would be uploaded
+        run: |
+          set -euo pipefail
+          ls -lh build/ppa/
+          for f in build/ppa/*.changes; do
+            echo "=== $f ==="
+            cat "$f"
+          done
+
+      - name: Upload to Launchpad
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          # One .changes per series. All of them must reference the same .orig,
+          # which build-ppa-source.sh guarantees by building it once per run.
+          for changes in build/ppa/*_source.changes; do
+            echo "uploading ${changes}"
+            dput ppa:vietanhng/thinkutils "${changes}"
+          done
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ppa-source-packages
+          path: build/ppa/
+          retention-days: 14
+
+      - name: Dry run notice
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "Dry run - nothing was uploaded. The source packages are attached"
+          echo "as an artifact. A Launchpad upload cannot be undone, so review"
+          echo "the .changes files before re-running with dry_run unchecked."
