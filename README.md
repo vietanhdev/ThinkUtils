@@ -57,6 +57,16 @@ sudo dpkg -i thinkutils_*.deb
 sudo rpm -i thinkutils-*.rpm
 ```
 
+### Wayland compatibility
+
+ThinkUtils automatically uses WebKitGTK's compatibility renderer on Wayland to
+avoid startup failures from unsupported DMA-BUF/EGL configurations. To retain
+WebKitGTK's default renderer for troubleshooting, launch with:
+
+```bash
+THINKUTILS_SKIP_WAYLAND_WORKAROUND=1 thinkutils
+```
+
 ## Features
 
 ### 🏠 Home Dashboard
