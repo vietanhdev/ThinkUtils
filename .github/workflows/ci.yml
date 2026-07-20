@@ -99,35 +99,19 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo install cargo-audit --locked
 
-      # Two advisory clusters are ignored, each with its reasoning and a tracking
-      # issue. They are ignored rather than tolerated as a red check because a job
-      # that is permanently failing teaches everyone to stop reading it -- at which
-      # point the NEXT advisory, the one that does matter, goes unnoticed too.
+      # Run with no exemptions at all. rmcp 2 cleared RUSTSEC-2026-0189 and the
+      # oauth2 5 / reqwest 0.12 upgrade cleared the rustls-webpki cluster, so
+      # every actionable advisory is genuinely fixed rather than suppressed.
+      # Only the unmaintained gtk-rs warnings remain, which cargo audit reports
+      # without failing on.
       #
-      # Re-litigate both when the upgrades land. Neither is a permanent exemption.
+      # Keep it exemption-free. A bare invocation is self-enforcing: adding an
+      # --ignore is a visible diff to this file, and a job that is permanently
+      # red is a job everyone stops reading -- at which point the NEXT advisory,
+      # the one that matters, goes unnoticed too.
       - name: cargo audit
         working-directory: src-tauri
-        run: |
-          cargo audit \
-            --ignore RUSTSEC-2026-0099 \
-            --ignore RUSTSEC-2026-0098 \
-            --ignore RUSTSEC-2026-0104
-
-      # RUSTSEC-2026-0189 (rmcp) is NO LONGER IGNORED -- rmcp 2.x cleared it.
-      #
-      # RUSTSEC-2026-0099 / -0098 / -0104 (rustls-webpki 0.101.7)
-      #   Transitive: rustls-webpki <- rustls 0.21 <- reqwest 0.11 <- oauth2 4.4.
-      #   Clearing them requires upgrading oauth2 to 5.0 and reqwest to 0.12+
-      #   together, since oauth2 4.4 pins reqwest 0.11. Both are breaking changes.
-      - name: Advisory exemptions must stay documented
-        run: |
-          set -euo pipefail
-          # Guards against an ignore being added without a reason next to it.
-          for id in RUSTSEC-2026-0099 RUSTSEC-2026-0098 RUSTSEC-2026-0104; do
-            grep -q "$id" .github/workflows/ci.yml || {
-              echo "::error::$id is ignored but has no documented justification"; exit 1; }
-          done
-          echo "OK: every advisory exemption carries its reasoning"
+        run: cargo audit
 
   # ThinkUtils tells users which packages to install and which commands to run.
   # Getting the distro wrong hands someone a command that cannot work.

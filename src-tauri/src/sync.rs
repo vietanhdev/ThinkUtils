@@ -1,6 +1,5 @@
 use chrono::Utc;
 use oauth2::basic::BasicClient;
-use oauth2::reqwest::async_http_client;
 use oauth2::{
     AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge, RedirectUrl,
     Scope, TokenResponse, TokenUrl,
@@ -161,7 +160,29 @@ fn write_private(path: &std::path::Path, content: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn create_oauth_client() -> Result<BasicClient, String> {
+/// The HTTP client oauth2 5.x uses for token exchange.
+///
+/// Redirects are disabled deliberately, per the oauth2 crate's own guidance:
+/// following them on a token endpoint opens the client to SSRF. In 4.x this was
+/// hidden inside the crate's `async_http_client`; 5.x hands the caller the
+/// choice, so the choice has to be made explicitly.
+fn oauth_http_client() -> Result<reqwest::Client, String> {
+    reqwest::ClientBuilder::new()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))
+}
+
+fn create_oauth_client() -> Result<
+    oauth2::basic::BasicClient<
+        oauth2::EndpointSet,
+        oauth2::EndpointNotSet,
+        oauth2::EndpointNotSet,
+        oauth2::EndpointNotSet,
+        oauth2::EndpointSet,
+    >,
+    String,
+> {
     let client_id = ClientId::new(
         GOOGLE_CLIENT_ID
             .filter(|s| !s.is_empty())
@@ -181,13 +202,17 @@ fn create_oauth_client() -> Result<BasicClient, String> {
     let token_url = TokenUrl::new("https://oauth2.googleapis.com/token".to_string())
         .map_err(|e| format!("Invalid token URL: {}", e))?;
 
-    Ok(
-        BasicClient::new(client_id, Some(client_secret), auth_url, Some(token_url))
-            .set_redirect_uri(
-                RedirectUrl::new(REDIRECT_URI.to_string())
-                    .map_err(|e| format!("Invalid redirect URL: {}", e))?,
-            ),
-    )
+    // 5.x replaces the four-argument constructor with a builder, and encodes
+    // which endpoints are configured in the type -- hence the EndpointSet
+    // parameters on the return type above.
+    Ok(BasicClient::new(client_id)
+        .set_client_secret(client_secret)
+        .set_auth_uri(auth_url)
+        .set_token_uri(token_url)
+        .set_redirect_uri(
+            RedirectUrl::new(REDIRECT_URI.to_string())
+                .map_err(|e| format!("Invalid redirect URL: {}", e))?,
+        ))
 }
 
 // Initiate Google OAuth flow
@@ -291,10 +316,11 @@ async fn exchange_code_for_token(code: String, state: String) -> Result<(), Stri
 
     let client = create_oauth_client()?;
 
+    let http_client = oauth_http_client()?;
     let token_result = client
         .exchange_code(AuthorizationCode::new(code))
         .set_pkce_verifier(oauth2::PkceCodeVerifier::new(pkce_verifier))
-        .request_async(async_http_client)
+        .request_async(&http_client)
         .await
         .map_err(|e| format!("Token exchange failed: {}", e))?;
 
@@ -685,5 +711,75 @@ mod tests {
         assert_eq!(fs::read_to_string(&path).unwrap(), "new");
 
         let _ = fs::remove_file(&path);
+    }
+
+    /// The redirect policy on the OAuth client is the SSRF guard, and nothing in
+    /// the type system holds it in place: swapping `oauth_http_client()` back to
+    /// `reqwest::Client::new()` compiles cleanly and silently restores the hole.
+    /// oauth2 4.x hid this decision inside the crate; 5.x made it the caller's,
+    /// which means it is now ours to regress.
+    ///
+    /// So assert the behaviour rather than the construction — serve a 302 and
+    /// require that it comes back *as* a 302, with the redirect target never
+    /// requested.
+    #[tokio::test]
+    async fn oauth_client_does_not_follow_redirects() {
+        use std::io::{Read, Write};
+        use std::sync::mpsc;
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind loopback");
+        let addr = listener.local_addr().unwrap();
+        let (tx, rx) = mpsc::channel::<String>();
+
+        // Detached: if the client correctly declines to follow, the second
+        // accept() blocks forever. The test never joins it, and the harness
+        // does not wait on detached threads at exit.
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { break };
+                let mut buf = [0u8; 1024];
+                let n = stream.read(&mut buf).unwrap_or(0);
+                let path = String::from_utf8_lossy(&buf[..n])
+                    .lines()
+                    .next()
+                    .and_then(|l| l.split_whitespace().nth(1))
+                    .unwrap_or("?")
+                    .to_string();
+                if tx.send(path.clone()).is_err() {
+                    break;
+                }
+                let response = if path == "/token" {
+                    "HTTP/1.1 302 Found\r\nLocation: /followed\r\nContent-Length: 0\r\n\r\n"
+                } else {
+                    "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
+                };
+                let _ = stream.write_all(response.as_bytes());
+            }
+        });
+
+        let response = oauth_http_client()
+            .expect("client builds")
+            .get(format!("http://{}/token", addr))
+            .send()
+            .await
+            .expect("request reaches the local server");
+
+        assert_eq!(
+            response.status().as_u16(),
+            302,
+            "the 302 was consumed instead of returned, so redirects are being followed"
+        );
+
+        assert_eq!(
+            rx.recv_timeout(std::time::Duration::from_secs(5)).unwrap(),
+            "/token",
+            "server should have seen the initial request"
+        );
+        assert!(
+            rx.recv_timeout(std::time::Duration::from_millis(500))
+                .is_err(),
+            "client followed the Location header — a token endpoint that redirects \
+             can now point this client at an arbitrary host"
+        );
     }
 }
