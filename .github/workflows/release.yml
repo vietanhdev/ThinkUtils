@@ -78,12 +78,12 @@ jobs:
           echo "confirmed ${actual}"
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -176,7 +176,7 @@ jobs:
           esac
           echo "OK: ${{ matrix.arch }} package ships the binary, a desktop entry, resolves every library, and holds the glibc floor"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-packages-${{ matrix.arch }}
           path: |
@@ -195,7 +195,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Get version
         id: version
@@ -206,7 +206,7 @@ jobs:
             echo "version=dev-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           fi
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: release-packages-*
           merge-multiple: true
@@ -233,7 +233,7 @@ jobs:
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             src-tauri/target/release/bundle/deb/*.deb
@@ -414,7 +414,7 @@ jobs:
 
       - name: Upload artifacts (non-tag builds)
         if: "!startsWith(github.ref, 'refs/tags/')"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: thinkutils-packages-${{ steps.version.outputs.version }}
           path: |

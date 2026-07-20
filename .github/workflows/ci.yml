@@ -45,7 +45,7 @@ jobs:
   version-consistency:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # One script owns the list, so adding a packaging file cannot leave CI
       # checking a stale subset of it.
       - name: Check every version declaration agrees
@@ -56,10 +56,10 @@ jobs:
   frontend:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
       # npm ci, not npm install: install can resolve a tree the lockfile does not
@@ -76,7 +76,7 @@ jobs:
         # Not a workspace: the manifest lives under src-tauri/.
         working-directory: src-tauri
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -110,7 +110,7 @@ jobs:
   audit:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo install cargo-audit --locked
 
@@ -140,7 +140,7 @@ jobs:
   distro-detection:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Re-fetch os-release from live distro images
         run: |
@@ -219,7 +219,7 @@ jobs:
   hardware-simulation:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -353,10 +353,10 @@ jobs:
           fi
           echo "confirmed ${actual}"
 
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -394,7 +394,7 @@ jobs:
       # Per-arch name: a single `packages` artifact would have the two matrix
       # legs racing to overwrite each other, and the loser's packages would
       # simply not exist with nothing reporting it.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: packages-${{ matrix.arch }}
           path: |
@@ -429,7 +429,7 @@ jobs:
     name: gui-launch (${{ matrix.arch }})
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: This runner really is ${{ matrix.arch }}
         run: |
@@ -441,7 +441,7 @@ jobs:
           fi
           echo "confirmed ${actual}"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: packages-${{ matrix.arch }}
           path: artifacts
@@ -465,7 +465,7 @@ jobs:
       # just whatever reached stdout before the container was discarded.
       - name: Upload screenshots, OCR text and app logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gui-launch-evidence-${{ matrix.arch }}
           path: build/gui-test-out/
@@ -478,10 +478,10 @@ jobs:
   docs:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
