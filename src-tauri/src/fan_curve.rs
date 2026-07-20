@@ -452,7 +452,14 @@ pub async fn fan_curve_background_task(app: AppHandle) {
             last_armed = Some(Instant::now());
         }
 
-        // Always emit temperature and current level to frontend for live UI updates
+        // Always emit temperature and current level to frontend for live UI updates.
+        //
+        // `controlling` says whether that level was actually applied. When every
+        // write is failing — no helper installed, /proc not writable — last_level
+        // stays None and this reported the level it *wanted*, indistinguishable
+        // from one it had set. The fan-curve-error toast fires once and is easy
+        // to miss or dismiss, after which the display looked correct forever.
+        let controlling = last_level.is_some();
         let display_level = last_level.unwrap_or(target_level);
         if let Err(e) = app.emit_to(
             "main",
@@ -460,6 +467,7 @@ pub async fn fan_curve_background_task(app: AppHandle) {
             serde_json::json!({
                 "temperature": temp,
                 "fan_level": display_level,
+                "controlling": controlling,
             }),
         ) {
             eprintln!("[Fan Curve] Failed to emit event: {}", e);
