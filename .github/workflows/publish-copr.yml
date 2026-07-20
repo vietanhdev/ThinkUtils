@@ -1,0 +1,104 @@
+name: Publish to COPR
+
+# workflow_dispatch only. A COPR build is queued against a public repository
+# users install from, and a bad SRPM is visible immediately.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (must be an existing git tag, without the leading v)"
+        required: true
+      dry_run:
+        description: "Build the SRPM but do not submit it"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    container:
+      image: fedora:41
+    steps:
+      - name: Install build tooling
+        run: |
+          set -euo pipefail
+          dnf install -y -q rpm-build rpmdevtools copr-cli git jq curl
+          # Needed for the pushed-tag check below.
+          git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+
+      # Source0 points at the tag tarball, so a queued build 404s partway through
+      # if the tag is not pushed. Cheaper to catch here than in the build log.
+      - name: Verify the tag is pushed
+        run: |
+          set -euo pipefail
+          tag="v${{ inputs.version }}"
+          git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null || {
+            echo "::error::${tag} does not exist on origin - push it before publishing"
+            exit 1
+          }
+          echo "OK: ${tag} exists on origin"
+
+      - name: Version must match the manifests
+        run: ./scripts/bump-version.sh --check
+
+      - name: Build the SRPM
+        run: |
+          set -euo pipefail
+          rpmdev-setuptree
+          cp packaging/copr/thinkutils.spec ~/rpmbuild/SPECS/
+
+          # -g fetches Source0; -R places it where rpmbuild expects. Doing this
+          # here rather than on the COPR builder means a broken Source0 fails
+          # now instead of after a queue wait.
+          spectool -g -R ~/rpmbuild/SPECS/thinkutils.spec
+          rpmbuild -bs ~/rpmbuild/SPECS/thinkutils.spec
+
+          srpm=$(find ~/rpmbuild/SRPMS -name '*.src.rpm' | head -1)
+          [ -n "$srpm" ] || { echo "::error::no SRPM produced"; exit 1; }
+          echo "SRPM=$srpm" >> "$GITHUB_ENV"
+          rpm -qip "$srpm"
+
+      - name: Lint the spec
+        run: rpmlint packaging/copr/thinkutils.spec || true
+
+      - name: Submit to COPR
+        if: ${{ !inputs.dry_run }}
+        env:
+          COPR_API_TOKEN: ${{ secrets.COPR_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${COPR_API_TOKEN:-}" ]; then
+            echo "::error::COPR_API_TOKEN is not set"
+            exit 1
+          fi
+
+          install -d -m 700 ~/.config
+          printf '%s\n' "$COPR_API_TOKEN" > ~/.config/copr
+          chmod 600 ~/.config/copr
+
+          # The spec fetches crates during %build, which mock forbids by default.
+          # This is a property of the PROJECT, not the spec, so it does not
+          # travel with the repository -- hence setting it on every publish
+          # rather than assuming someone did it once.
+          copr-cli modify thinkutils --enable-net on || \
+            echo "::warning::could not set --enable-net; the build will fail if it is off"
+
+          # Newest three x86_64 chroots, resolved rather than hardcoded: a fixed
+          # list goes stale every six months when Fedora branches.
+          chroots=$(copr-cli list-chroots 2>/dev/null \
+            | grep -E '^fedora-[0-9]+-x86_64$' | sort -V | tail -3)
+          echo "chroots: ${chroots}"
+
+          args=()
+          for c in ${chroots}; do args+=(-r "$c"); done
+
+          copr-cli build "${args[@]}" thinkutils "${SRPM}"
+
+      - name: Dry run notice
+        if: ${{ inputs.dry_run }}
+        run: echo "Dry run - the SRPM built but was not submitted. Re-run with dry_run unchecked to publish."

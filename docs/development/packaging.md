@@ -65,6 +65,51 @@ The passwordless rule would be read by nothing there, so every fan change would
 prompt for a password. Shipping a package whose headline feature silently
 degrades is worse than not shipping it.
 
+## Publishing
+
+Three workflows, all `workflow_dispatch` only and all defaulting to `dry_run: true`:
+
+| Workflow | Secret needed | Reversible? |
+| --- | --- | --- |
+| `publish-aur.yml` | `AUR_SSH_PRIVATE_KEY` | Yes — push again |
+| `publish-copr.yml` | `COPR_API_TOKEN` | Yes — rebuild |
+| `publish-ppa.yml` | `LAUNCHPAD_GPG_PRIVATE_KEY`, `LAUNCHPAD_GPG_PASSPHRASE` | **No** |
+
+A Launchpad upload cannot be undone. A version can be superseded, never deleted,
+which is why that workflow defaults to a dry run and prints every `.changes` file
+before it would upload.
+
+All three verify the git tag is **pushed** before doing anything: AUR's `source`
+and COPR's `Source0` both point at the tag tarball, so a queued build would 404
+partway through if the tag were only local.
+
+### One-time setup
+
+**AUR** — `ssh-keygen -t ed25519`, register the public half under My Account at
+aur.archlinux.org, then `gh secret set AUR_SSH_PRIVATE_KEY < key`. Verify with
+`ssh aur@aur.archlinux.org`; a welcome banner means it works.
+
+**COPR** — copy the whole `[copr-cli]` block from
+<https://copr.fedorainfracloud.org/api/> into `COPR_API_TOKEN`. Tokens expire; a
+403 means regenerate. The workflow sets `--enable-net on` each run, because
+`%build` fetches crates and mock disables builder networking by default — and
+that setting lives on the *project*, so it does not travel with this repository.
+
+**Launchpad** — the fiddliest:
+
+1. Sign the Ubuntu Code of Conduct. Uploads are rejected without it.
+2. `gpg --full-generate-key` (RSA 4096), dedicated to CI.
+3. `gpg --send-keys --keyserver keyserver.ubuntu.com <KEYID>`.
+4. Launchpad profile → OpenPGP keys → Import, paste the fingerprint. Launchpad
+   emails an **encrypted** token; `gpg --decrypt` it and follow the link.
+5. `gpg --armor --export-secret-keys <KEYID>` into `LAUNCHPAD_GPG_PRIVATE_KEY`.
+
+The passphrase goes in `gpg.conf`, not a command-line argument, because
+`dpkg-buildpackage` invokes `gpg` itself with no passphrase argument. The
+gpg-agent preset approach does not work: `pinentry-mode loopback` bypasses the
+agent entirely, so the preset is never consulted and signing fails headless with
+"Operation cancelled".
+
 ## Version bumps
 
 One command covers all seven declarations:

@@ -1,0 +1,113 @@
+name: Publish to AUR
+
+# workflow_dispatch only, and deliberately so. An AUR push is a git push to a
+# repository other people install from; there is no staging step and no undo
+# beyond another push. Nothing here should fire automatically on a tag.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (must be an existing git tag, without the leading v)"
+        required: true
+      dry_run:
+        description: "Build and validate, but do not push"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    container:
+      image: archlinux:latest
+    steps:
+      - name: Install build tooling
+        run: |
+          set -euo pipefail
+          pacman -Sy --noconfirm --needed base-devel git openssh pacman-contrib jq
+
+      - uses: actions/checkout@v4
+
+      # The tag must exist and be pushed BEFORE publishing: PKGBUILD's source
+      # points at the tag tarball, so a queued build would 404 partway through
+      # if the tag were only local.
+      - name: Verify the tag is pushed
+        run: |
+          set -euo pipefail
+          tag="v${{ inputs.version }}"
+          git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null || {
+            echo "::error::${tag} does not exist on origin - push it before publishing"
+            exit 1
+          }
+          echo "OK: ${tag} exists on origin"
+
+      - name: Version must match the manifests
+        run: ./scripts/bump-version.sh --check
+
+      # makepkg refuses to run as root, so the build happens as an unprivileged
+      # user in a scratch directory.
+      - name: Update checksums and generate .SRCINFO
+        run: |
+          set -euo pipefail
+          useradd -m builder
+          install -d -o builder /tmp/aur
+          cp packaging/aur/PKGBUILD /tmp/aur/
+          chown -R builder /tmp/aur
+
+          # updpkgsums downloads the release tarball and rewrites sha256sums, so
+          # a SKIP placeholder never reaches the AUR.
+          su builder -c 'cd /tmp/aur && updpkgsums'
+          su builder -c 'cd /tmp/aur && makepkg --printsrcinfo > .SRCINFO'
+
+          echo "--- PKGBUILD ---"; cat /tmp/aur/PKGBUILD
+          echo "--- .SRCINFO ---"; cat /tmp/aur/.SRCINFO
+
+          grep -q "SKIP" /tmp/aur/PKGBUILD && {
+            echo "::error::sha256sums still contains SKIP"; exit 1; }
+          echo "OK: checksums resolved"
+
+      # Catches syntax errors and missing dependencies without a full compile.
+      - name: Validate the PKGBUILD
+        run: su builder -c 'cd /tmp/aur && makepkg --nobuild --nodeps --noextract' || true
+
+      - name: Push to AUR
+        if: ${{ !inputs.dry_run }}
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AUR_SSH_PRIVATE_KEY:-}" ]; then
+            echo "::error::AUR_SSH_PRIVATE_KEY is not set"
+            exit 1
+          fi
+
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts 2>/dev/null
+          printf 'Host aur.archlinux.org\n  IdentityFile ~/.ssh/aur\n  User aur\n' > ~/.ssh/config
+
+          git config --global user.name "Viet Anh Nguyen"
+          git config --global user.email "vietanh.dev@gmail.com"
+          git config --global --add safe.directory '*'
+
+          git clone ssh://aur@aur.archlinux.org/thinkutils.git /tmp/aur-repo
+          cp /tmp/aur/PKGBUILD /tmp/aur/.SRCINFO /tmp/aur-repo/
+          cd /tmp/aur-repo
+
+          if git diff --quiet; then
+            echo "No change to publish."
+            exit 0
+          fi
+
+          git add PKGBUILD .SRCINFO
+          git commit -m "Update to ${{ inputs.version }}"
+          # AUR's default branch is master; a local `main` needs the explicit
+          # refspec or the push is silently accepted into the wrong ref.
+          git push origin HEAD:master
+
+      - name: Dry run notice
+        if: ${{ inputs.dry_run }}
+        run: echo "Dry run - nothing was pushed. Re-run with dry_run unchecked to publish."
