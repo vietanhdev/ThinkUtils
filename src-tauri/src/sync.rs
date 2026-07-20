@@ -712,4 +712,74 @@ mod tests {
 
         let _ = fs::remove_file(&path);
     }
+
+    /// The redirect policy on the OAuth client is the SSRF guard, and nothing in
+    /// the type system holds it in place: swapping `oauth_http_client()` back to
+    /// `reqwest::Client::new()` compiles cleanly and silently restores the hole.
+    /// oauth2 4.x hid this decision inside the crate; 5.x made it the caller's,
+    /// which means it is now ours to regress.
+    ///
+    /// So assert the behaviour rather than the construction — serve a 302 and
+    /// require that it comes back *as* a 302, with the redirect target never
+    /// requested.
+    #[tokio::test]
+    async fn oauth_client_does_not_follow_redirects() {
+        use std::io::{Read, Write};
+        use std::sync::mpsc;
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind loopback");
+        let addr = listener.local_addr().unwrap();
+        let (tx, rx) = mpsc::channel::<String>();
+
+        // Detached: if the client correctly declines to follow, the second
+        // accept() blocks forever. The test never joins it, and the harness
+        // does not wait on detached threads at exit.
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { break };
+                let mut buf = [0u8; 1024];
+                let n = stream.read(&mut buf).unwrap_or(0);
+                let path = String::from_utf8_lossy(&buf[..n])
+                    .lines()
+                    .next()
+                    .and_then(|l| l.split_whitespace().nth(1))
+                    .unwrap_or("?")
+                    .to_string();
+                if tx.send(path.clone()).is_err() {
+                    break;
+                }
+                let response = if path == "/token" {
+                    "HTTP/1.1 302 Found\r\nLocation: /followed\r\nContent-Length: 0\r\n\r\n"
+                } else {
+                    "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"
+                };
+                let _ = stream.write_all(response.as_bytes());
+            }
+        });
+
+        let response = oauth_http_client()
+            .expect("client builds")
+            .get(format!("http://{}/token", addr))
+            .send()
+            .await
+            .expect("request reaches the local server");
+
+        assert_eq!(
+            response.status().as_u16(),
+            302,
+            "the 302 was consumed instead of returned, so redirects are being followed"
+        );
+
+        assert_eq!(
+            rx.recv_timeout(std::time::Duration::from_secs(5)).unwrap(),
+            "/token",
+            "server should have seen the initial request"
+        );
+        assert!(
+            rx.recv_timeout(std::time::Duration::from_millis(500))
+                .is_err(),
+            "client followed the Location header — a token endpoint that redirects \
+             can now point this client at an arbitrary host"
+        );
+    }
 }
