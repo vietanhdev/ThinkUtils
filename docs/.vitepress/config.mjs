@@ -43,6 +43,7 @@ export default withMermaid(
             items: [
               { text: 'Architecture', link: '/development/architecture' },
               { text: 'Packaging', link: '/development/packaging' },
+              { text: 'APT Signing', link: '/development/apt-signing' },
               { text: 'CSS Architecture', link: '/development/css' },
               { text: 'Icon Generation', link: '/development/icons' },
               {
