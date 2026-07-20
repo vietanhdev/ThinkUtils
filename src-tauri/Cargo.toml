@@ -1,6 +1,6 @@
 [package]
 name = "thinkutils"
-version = "0.1.10"
+version = "0.2.0"
 description = "ThinkPad utilities for Linux - Fan control, battery management, and system monitoring"
 authors = ["Viet Anh Nguyen"]
 edition = "2021"
@@ -42,4 +42,3 @@ rmcp = { version = "2", features = ["server", "server-side-http", "transport-str
 schemars = "0.8"
 tokio-util = "0.7"
 axum = "0.8.9"
-
