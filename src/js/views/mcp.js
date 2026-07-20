@@ -60,7 +60,7 @@ export async function loadMcpStatus() {
   try {
     const response = await invoke('get_mcp_status');
     if (response.success && response.data) {
-      const { running, host, port } = response.data;
+      const { running, host, port, path } = response.data;
       if (running) {
         dot.className = 'status-dot installed';
         text.textContent = `Running on ${host}:${port}`;
@@ -80,19 +80,24 @@ export async function loadMcpStatus() {
       }
 
       // Update config snippets with current host/port
-      updateConfigSnippets(host, port);
+      updateConfigSnippets(host, port, path);
     }
   } catch (error) {
     console.error('[MCP] Status check failed:', error);
   }
 }
 
-function updateConfigSnippets(host, port) {
-  const url = `http://${host}:${port}/sse`;
+// The path comes from the backend (McpStatus.path) so these snippets cannot
+// drift from the route the router actually serves. They were hardcoded to
+// `/sse` from the rmcp 0.1.5 days; rmcp 2 serves Streamable HTTP at `/mcp` and
+// nothing at `/sse`, so every pasted config 404'd.
+function updateConfigSnippets(host, port, path = '/mcp') {
+  const url = `http://${host}:${port}${path}`;
 
-  // Claude Code uses "type": "sse"
+  // Streamable HTTP is "type": "http" -- "sse" selects the transport rmcp 2
+  // removed, which fails even against the correct URL.
   const claudeCodeStr = JSON.stringify(
-    { mcpServers: { thinkutils: { type: 'sse', url } } },
+    { mcpServers: { thinkutils: { type: 'http', url } } },
     null,
     2
   );

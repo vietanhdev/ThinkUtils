@@ -60,6 +60,14 @@ fn resolve_bind_host(host: &str) -> &str {
 
 // -- Shared state for managing the MCP server lifecycle --
 
+/// The path the Streamable HTTP transport is mounted at.
+///
+/// Exposed so the client-config snippets shown in the UI are generated from the
+/// same value the router is built with. They were hardcoded to `/sse`, left over
+/// from rmcp 0.1.5's SSE transport, and rmcp 2 serves nothing there — so anyone
+/// pasting the displayed config got a 404 on every connection.
+pub const MCP_PATH: &str = "/mcp";
+
 pub struct McpServerState {
     cancel_token: Option<CancellationToken>,
     pub host: String,
@@ -338,6 +346,9 @@ pub struct McpStatus {
     pub running: bool,
     pub host: String,
     pub port: u16,
+    /// Reported so the UI builds its client-config snippets from the path the
+    /// router actually serves, rather than a second copy that can drift from it.
+    pub path: String,
 }
 
 #[tauri::command]
@@ -351,6 +362,7 @@ pub async fn get_mcp_status(
             running: s.cancel_token.is_some(),
             host: s.host.clone(),
             port: s.port,
+            path: MCP_PATH.to_string(),
         }),
         error: None,
     })
@@ -405,6 +417,23 @@ pub async fn start_mcp_server(
     // at all) still works, while anything originating in a browser tab is rejected
     // unless it is genuinely same-origin.
 
+    // Bind BEFORE spawning. Binding inside the task left its error with nowhere
+    // to go but eprintln!, while this function unconditionally reported success
+    // and recorded a cancel token -- so an unusable port (already taken, or
+    // privileged and EACCES) showed "Running" in the UI, and every retry was
+    // refused with "already running" until the user pressed Stop.
+    let listener = match tokio::net::TcpListener::bind(addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("[MCP] Failed to bind {}: {}", addr, e);
+            return Ok(ApiResponse {
+                success: false,
+                data: None,
+                error: Some(format!("Could not listen on {}: {}", addr, e)),
+            });
+        }
+    };
+
     tokio::spawn(async move {
         println!(
             "[MCP] Starting Streamable HTTP server on http://{}/mcp",
@@ -417,15 +446,7 @@ pub async fn start_mcp_server(
             config,
         );
 
-        let router = axum::Router::new().nest_service("/mcp", service);
-
-        let listener = match tokio::net::TcpListener::bind(addr).await {
-            Ok(l) => l,
-            Err(e) => {
-                eprintln!("[MCP] Failed to bind {}: {}", addr, e);
-                return;
-            }
-        };
+        let router = axum::Router::new().nest_service(MCP_PATH, service);
 
         let server = axum::serve(listener, router).with_graceful_shutdown(async move {
             ct_clone.cancelled().await;
@@ -478,6 +499,40 @@ pub async fn stop_mcp_server(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // -- Client-config endpoint --
+
+    /// The UI and the docs tell users which URL to point their MCP client at.
+    /// Both used to hardcode `/sse`, left over from rmcp 0.1.5's SSE transport,
+    /// while rmcp 2 serves Streamable HTTP at `/mcp` and nothing at `/sse` — so
+    /// every config copied out of the app 404'd on connect.
+    ///
+    /// The status payload now carries the path, and this pins that payload to
+    /// the constant the router is built from.
+    #[test]
+    fn advertised_path_is_the_one_the_router_serves() {
+        assert_eq!(MCP_PATH, "/mcp");
+        assert!(
+            MCP_PATH.starts_with('/'),
+            "nest_service requires a leading slash"
+        );
+        assert_ne!(
+            MCP_PATH, "/sse",
+            "rmcp 2 removed the SSE server transport entirely"
+        );
+    }
+
+    /// The source file must not reintroduce a second, hardcoded copy of the
+    /// path. Scoped to code above the test module so this cannot match itself.
+    #[test]
+    fn router_path_is_not_hardcoded_alongside_the_constant() {
+        let src = include_str!("mcp.rs");
+        let code = src.split("#[cfg(test)]").next().unwrap();
+        assert!(
+            !code.contains("nest_service(\""),
+            "nest_service should be given MCP_PATH, not a literal"
+        );
+    }
 
     // -- Host and Origin allowlists (the point of the rmcp 2 migration) --
 

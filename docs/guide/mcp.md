@@ -28,7 +28,7 @@ Start the MCP server from the app's MCP page, then configure your AI tool:
 ### Claude Code
 
 ```bash
-claude mcp add --transport http thinkutils http://127.0.0.1:8765/sse
+claude mcp add --transport http thinkutils http://127.0.0.1:8765/mcp
 ```
 
 Or add to `.mcp.json` in your project:
@@ -37,8 +37,8 @@ Or add to `.mcp.json` in your project:
 {
   "mcpServers": {
     "thinkutils": {
-      "type": "sse",
-      "url": "http://127.0.0.1:8765/sse"
+      "type": "http",
+      "url": "http://127.0.0.1:8765/mcp"
     }
   }
 }
@@ -52,7 +52,7 @@ Add to `~/.config/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "thinkutils": {
-      "url": "http://127.0.0.1:8765/sse"
+      "url": "http://127.0.0.1:8765/mcp"
     }
   }
 }
@@ -66,7 +66,7 @@ Add to `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (global):
 {
   "mcpServers": {
     "thinkutils": {
-      "url": "http://127.0.0.1:8765/sse"
+      "url": "http://127.0.0.1:8765/mcp"
     }
   }
 }
@@ -80,7 +80,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 {
   "mcpServers": {
     "thinkutils": {
-      "url": "http://127.0.0.1:8765/sse"
+      "url": "http://127.0.0.1:8765/mcp"
     }
   }
 }
@@ -94,7 +94,7 @@ Add to `~/.lmstudio/mcp.json`:
 {
   "mcpServers": {
     "thinkutils": {
-      "url": "http://127.0.0.1:8765/sse"
+      "url": "http://127.0.0.1:8765/mcp"
     }
   }
 }
@@ -107,7 +107,7 @@ Or in the app: switch to the **Program** tab, click **Install**, then **Edit mcp
 In ChatGPT Desktop, click your profile > **Settings** > **Connectors** > **Advanced settings**, enable **Developer mode**, then go back to Connectors and click **Create**:
 
 - **Name**: ThinkUtils
-- **Server URL**: `http://127.0.0.1:8765/sse`
+- **Server URL**: `http://127.0.0.1:8765/mcp`
 
 ::: info
 Requires ChatGPT Desktop with MCP support (Plus/Team/Enterprise).
@@ -115,4 +115,4 @@ Requires ChatGPT Desktop with MCP support (Plus/Team/Enterprise).
 
 ### Other Tools
 
-For any MCP-compatible client, configure an SSE server with URL `http://127.0.0.1:8765/sse`.
+For any MCP-compatible client, configure a Streamable HTTP server with URL `http://127.0.0.1:8765/mcp`.
