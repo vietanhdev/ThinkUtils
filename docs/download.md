@@ -120,6 +120,22 @@ sudo apt update
 sudo apt install thinkutils
 ```
 
+::: warning What `[trusted=yes]` means
+This repository is not yet GPG-signed, and `[trusted=yes]` tells `apt` to install
+from it without verifying any signature. HTTPS still authenticates the server for
+the duration of the download, but nothing proves the packages are the ones our CI
+built — and ThinkUtils installs a helper that runs as root.
+
+If that trade-off is not one you want to make, download the `.deb` from the
+[releases page](https://github.com/vietanhdev/ThinkUtils/releases) and install it
+with `apt install ./thinkutils_*.deb` instead. You give up automatic updates and
+check for new versions yourself.
+
+Signing is implemented and waiting on a key — see
+[apt-signing](/development/apt-signing). Once it is enabled these instructions
+change to `signed-by=` and the `[trusted=yes]` flag goes away.
+:::
+
 ## Before fan control works
 
 One step is not optional, and it is the most common reason people think the app
