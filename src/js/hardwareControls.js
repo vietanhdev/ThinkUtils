@@ -25,6 +25,25 @@ const { invoke } = window.__TAURI__.core;
 const GOVERNOR_SETTLE_MS = 500;
 
 /**
+ * Controls with a privileged write in flight.
+ *
+ * These writes go through pkexec, so they sit unresolved for as long as the
+ * password prompt is on screen — often many seconds. Meanwhile Home polls every
+ * 2s and reassigns `toggle.checked` from sysfs, which still reports the OLD
+ * value because nothing has been written yet. The user watches their toggle
+ * flip back while they are still typing their password.
+ *
+ * It did correct itself afterwards, so this is not a lasting desync — but it
+ * reads as the app rejecting the click, which is the opposite of what happened.
+ */
+const inFlight = new Set();
+
+/** Whether a refresh should leave this control alone. */
+export function isControlBusy(name) {
+  return inFlight.has(name);
+}
+
+/**
  * Run a privileged hardware action with consistent status reporting.
  *
  * `busy` elements are disabled for the duration — the governor path could
@@ -95,13 +114,21 @@ export async function setCpuGovernor(governor, refresh, busy = []) {
 }
 
 export async function setTurboBoost(enabled, refresh, toggleEl) {
-  const ok = await runAction({
-    pending: `${enabled ? 'Enabling' : 'Disabling'} turbo boost...`,
-    success: `Turbo boost ${enabled ? 'enabled' : 'disabled'}`,
-    invokeName: 'set_turbo_boost',
-    args: { enabled },
-    refresh
-  });
+  inFlight.add('turbo');
+  let ok;
+  try {
+    ok = await runAction({
+      pending: `${enabled ? 'Enabling' : 'Disabling'} turbo boost...`,
+      success: `Turbo boost ${enabled ? 'enabled' : 'disabled'}`,
+      invokeName: 'set_turbo_boost',
+      args: { enabled },
+      refresh
+    });
+  } finally {
+    // Cleared before the failure handling below, so the corrective flip on a
+    // rejected write is not itself suppressed by a later refresh.
+    inFlight.delete('turbo');
+  }
 
   // A checkbox that stays flipped after a failed write tells the user the
   // opposite of what happened.

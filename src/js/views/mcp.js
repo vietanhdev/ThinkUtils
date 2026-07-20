@@ -3,6 +3,16 @@ const { invoke } = window.__TAURI__.core;
 
 let mcpSetupDone = false;
 
+/**
+ * Whether the server is running, as last reported by the backend.
+ *
+ * `null` means unknown — the status call failed, so nothing has confirmed the
+ * state. Deriving this from the toggle button's label instead meant a single
+ * failed status read could strand the UI showing "Starting..." forever while
+ * the server ran fine.
+ */
+let serverRunning = null;
+
 export function setupMcpView() {
   if (mcpSetupDone) {
     return;
@@ -61,6 +71,7 @@ export async function loadMcpStatus() {
     const response = await invoke('get_mcp_status');
     if (response.success && response.data) {
       const { running, host, port, path } = response.data;
+      serverRunning = running;
       if (running) {
         dot.className = 'status-dot installed';
         text.textContent = `Running on ${host}:${port}`;
@@ -81,9 +92,17 @@ export async function loadMcpStatus() {
 
       // Update config snippets with current host/port
       updateConfigSnippets(host, port, path);
+    } else {
+      // Backend answered but could not report state. Say so rather than leaving
+      // whatever the last render showed.
+      serverRunning = null;
+      dot.className = 'status-dot not-installed';
+      text.textContent = `Status unavailable: ${response.error ?? 'unknown error'}`;
     }
   } catch (error) {
     console.error('[MCP] Status check failed:', error);
+    serverRunning = null;
+    text.textContent = 'Status unavailable';
   }
 }
 
@@ -137,7 +156,26 @@ async function toggleMcpServer() {
     return;
   }
 
-  const isRunning = btn.textContent === 'Stop Server';
+  // Read the tracked state, not the button's own label. loadMcpStatus only
+  // relabels the button when the status call succeeds, and its catch merely
+  // logs -- so one failed status read left the label reading "Starting..."
+  // while the server was in fact running. The next click then evaluated
+  // "not Stop Server" as "not running" and issued a second start against the
+  // bound port, reporting "Address already in use" for a healthy server, with
+  // Stop unreachable short of restarting the app.
+  if (serverRunning === null) {
+    // State unknown after a failed read: resolve it before acting rather than
+    // guessing, since guessing wrong is what caused the deadlock.
+    await loadMcpStatus();
+    if (serverRunning === null) {
+      if (text) {
+        text.textContent = 'Cannot reach the server status - try again';
+      }
+      return;
+    }
+  }
+
+  const isRunning = serverRunning;
   btn.disabled = true;
 
   try {

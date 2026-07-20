@@ -1,6 +1,12 @@
 // Home View
 const { invoke } = window.__TAURI__.core;
-import { setPowerProfile, setCpuGovernor, setTurboBoost, bindOnce } from '../hardwareControls.js';
+import {
+  setPowerProfile,
+  setCpuGovernor,
+  setTurboBoost,
+  bindOnce,
+  isControlBusy
+} from '../hardwareControls.js';
 
 export async function updateHomeView() {
   try {
@@ -148,8 +154,11 @@ export async function updateHomeView() {
       if (statusEl) {
         statusEl.textContent = enabled ? 'Enabled' : 'Disabled';
       }
+      // Not while the user's own change is still waiting on pkexec: sysfs
+      // still reports the old value, so this would flip the toggle back under
+      // them mid-authentication.
       const toggle = document.getElementById('home-turbo-toggle');
-      if (toggle) {
+      if (toggle && !isControlBusy('turbo')) {
         toggle.checked = enabled;
       }
     }
