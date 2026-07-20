@@ -64,12 +64,17 @@ export async function startCurveMode() {
     const { listen } = window.__TAURI__.event;
     if (!window.fanCurveUnlisten) {
       window.fanCurveUnlisten = await listen('fan-curve-update', (event) => {
-        const { temperature, fan_level } = event.payload;
+        const { temperature, fan_level, controlling } = event.payload;
         currentTemp = temperature;
 
-        // Update UI
+        // Update UI. `controlling` is false when the backend computed this level
+        // but could not apply it, which otherwise looks identical to a level it
+        // did apply — the error toast fires once and is easy to miss.
         document.getElementById('curve-current-temp').textContent = `${temperature}°C`;
-        document.getElementById('curve-target-speed').textContent = `Level ${fan_level}`;
+        const speedEl = document.getElementById('curve-target-speed');
+        speedEl.textContent =
+          controlling === false ? `Level ${fan_level} (not applied)` : `Level ${fan_level}`;
+        speedEl.classList.toggle('curve-not-applied', controlling === false);
 
         drawCurve();
       });

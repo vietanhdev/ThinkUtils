@@ -621,6 +621,13 @@
   color: var(--text-primary);
 }
 
+/* The curve computed this level but could not apply it — usually no fan helper
+   installed. Without this the figure is indistinguishable from one that took
+   effect, and the accompanying error toast only appears once. */
+.curve-info-value.curve-not-applied {
+  color: var(--power-color);
+}
+
 .fan-curve-help,
 .curve-help {
   padding: 12px;
