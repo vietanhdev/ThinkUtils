@@ -95,6 +95,51 @@ fn validate_governor(governor: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Where the per-CPU governor files live. A glob, not a count, so it is the
+/// root shell that decides which CPUs exist — see [`governor_script`].
+const CPU_GLOB: &str = "/sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_governor";
+
+/// Build the script that applies `governor` to every CPU exposing a governor file.
+///
+/// The previous version counted `cpuN` directories and emitted one fixed
+/// redirect per index under `set -e`. That broke in two ways: the count includes
+/// CPUs that are present but OFFLINE, whose `cpufreq/` directory the kernel
+/// removes, and it assumes contiguous numbering. Offlining a core — disabling
+/// SMT, say — made that index's redirect fail with ENOENT, `set -e` aborted, and
+/// pkexec returned non-zero *after* the earlier cores had already been changed.
+/// The machine was left with mixed governors while the UI said nothing happened.
+///
+/// Globbing defers the decision to execution time, as root, so it sees whatever
+/// CPUs are online at that moment. Only a total failure is an error: one core
+/// going offline mid-run must not discard the ones that were set.
+///
+/// `governor` is validated against the kernel's own list before it gets here,
+/// so interpolating it is safe.
+fn governor_script(governor: &str, glob: &str) -> String {
+    format!(
+        r#"#!/bin/bash
+set -u
+applied=0
+failed=0
+for f in {glob}; do
+  [ -e "$f" ] || continue
+  if echo {governor} > "$f" 2>/dev/null; then
+    applied=$((applied + 1))
+  else
+    failed=$((failed + 1))
+    echo "could not write $f" >&2
+  fi
+done
+echo "governor applied to $applied CPU(s), $failed refused"
+if [ "$applied" -eq 0 ]; then
+  echo "no CPU accepted the governor" >&2
+  exit 1
+fi
+exit 0
+"#
+    )
+}
+
 #[tauri::command]
 pub async fn set_cpu_governor(governor: String) -> ApiResponse<String> {
     println!("[Performance] Setting CPU governor to: {}", governor);
@@ -109,35 +154,8 @@ pub async fn set_cpu_governor(governor: String) -> ApiResponse<String> {
         };
     }
 
-    // Get number of CPUs
-    let cpu_count = fs::read_dir("/sys/devices/system/cpu")
-        .ok()
-        .map(|entries| {
-            entries
-                .filter_map(|e| e.ok())
-                .filter(|e| {
-                    e.file_name().to_string_lossy().starts_with("cpu")
-                        && e.file_name().to_string_lossy()[3..]
-                            .chars()
-                            .all(|c| c.is_numeric())
-                })
-                .count()
-        })
-        .unwrap_or(1);
-
-    println!("[Performance] Found {} CPU cores", cpu_count);
-
-    // Create script to set governor for all CPUs
     let temp_script = format!("/tmp/set_governor_{}.sh", std::process::id());
-    let mut script_content = String::from("#!/bin/bash\nset -e\n");
-
-    for i in 0..cpu_count {
-        script_content.push_str(&format!(
-            "echo {} > /sys/devices/system/cpu/cpu{}/cpufreq/scaling_governor\n",
-            governor, i
-        ));
-    }
-    script_content.push_str("exit 0\n");
+    let script_content = governor_script(&governor, CPU_GLOB);
 
     println!("[Performance] Script content:\n{}", script_content);
 
@@ -457,6 +475,172 @@ pub async fn set_turbo_boost(enabled: bool) -> ApiResponse<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Build a fake CPU tree and actually run the generated script against it.
+    ///
+    /// `online` lists the CPU indices that get a `cpufreq/scaling_governor`;
+    /// any index in `present` but not `online` gets a bare `cpuN` directory,
+    /// which is exactly what the kernel leaves behind for an offline CPU.
+    fn run_governor_script(present: &[u32], online: &[u32]) -> (bool, String, Vec<(u32, String)>) {
+        let root = std::env::temp_dir().join(format!(
+            "thinkutils_gov_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+
+        for cpu in present {
+            let dir = root.join(format!("cpu{}", cpu));
+            if online.contains(cpu) {
+                let freq = dir.join("cpufreq");
+                fs::create_dir_all(&freq).unwrap();
+                fs::write(freq.join("scaling_governor"), "powersave\n").unwrap();
+            } else {
+                fs::create_dir_all(&dir).unwrap();
+            }
+        }
+
+        let glob = format!("{}/cpu[0-9]*/cpufreq/scaling_governor", root.display());
+        let script = governor_script("performance", &glob);
+
+        let out = std::process::Command::new("bash")
+            .arg("-c")
+            .arg(&script)
+            .output()
+            .expect("bash runs");
+
+        let mut written = Vec::new();
+        for cpu in online {
+            let p = root
+                .join(format!("cpu{}", cpu))
+                .join("cpufreq/scaling_governor");
+            if let Ok(v) = fs::read_to_string(&p) {
+                written.push((*cpu, v.trim().to_string()));
+            }
+        }
+
+        let combined = format!(
+            "{}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let _ = fs::remove_dir_all(&root);
+        (out.status.success(), combined, written)
+    }
+
+    /// The regression: cpu5 offline used to abort the whole script under set -e,
+    /// after cpu0..cpu4 had already been changed — mixed governors, and a UI
+    /// saying the operation failed.
+    #[test]
+    fn an_offline_cpu_does_not_abort_the_others() {
+        let (ok, output, written) = run_governor_script(&[0, 1, 2, 3, 4, 5], &[0, 1, 2, 3, 4]);
+
+        assert!(
+            ok,
+            "script should succeed despite cpu5 being offline:\n{output}"
+        );
+        assert_eq!(written.len(), 5, "every online CPU should be written");
+        for (cpu, value) in &written {
+            assert_eq!(value, "performance", "cpu{} kept the old governor", cpu);
+        }
+        assert!(
+            output.contains("applied to 5 CPU(s)"),
+            "should report what it actually did:\n{output}"
+        );
+    }
+
+    /// Numbering is not guaranteed contiguous, and indexing 0..count assumed it.
+    #[test]
+    fn non_contiguous_cpu_numbering_is_handled() {
+        let (ok, output, written) = run_governor_script(&[0, 3, 7], &[0, 3, 7]);
+
+        assert!(ok, "gaps in numbering are normal:\n{output}");
+        assert_eq!(written.len(), 3, "cpu0, cpu3 and cpu7 should all be set");
+    }
+
+    /// An existing-but-unwritable governor file is the case `set -e` actually
+    /// aborted on, so exercise it directly: one refusal must not cost the rest.
+    #[cfg(unix)]
+    #[test]
+    fn one_refused_write_does_not_discard_the_successful_ones() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = std::env::temp_dir().join(format!(
+            "thinkutils_gov_ro_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+
+        for cpu in 0..3u32 {
+            let freq = root.join(format!("cpu{}", cpu)).join("cpufreq");
+            fs::create_dir_all(&freq).unwrap();
+            let f = freq.join("scaling_governor");
+            fs::write(&f, "powersave\n").unwrap();
+            if cpu == 1 {
+                fs::set_permissions(&f, fs::Permissions::from_mode(0o444)).unwrap();
+            }
+        }
+
+        let glob = format!("{}/cpu[0-9]*/cpufreq/scaling_governor", root.display());
+        let out = std::process::Command::new("bash")
+            .arg("-c")
+            .arg(governor_script("performance", &glob))
+            .output()
+            .expect("bash runs");
+        let combined = format!(
+            "{}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+
+        let read = |cpu: u32| {
+            fs::read_to_string(
+                root.join(format!("cpu{}", cpu))
+                    .join("cpufreq/scaling_governor"),
+            )
+            .unwrap()
+            .trim()
+            .to_string()
+        };
+
+        // Root can write through 0444, which would make this assert nothing.
+        if read(1) == "performance" {
+            let _ = fs::remove_dir_all(&root);
+            eprintln!("skipping: running as root, 0444 is not enforced");
+            return;
+        }
+
+        assert!(
+            out.status.success(),
+            "one unwritable CPU must not fail the whole operation:\n{combined}"
+        );
+        assert_eq!(read(0), "performance", "cpu0 should have been set");
+        assert_eq!(read(2), "performance", "cpu2 should have been set");
+        assert!(
+            combined.contains("applied to 2 CPU(s), 1 refused"),
+            "should report the partial result honestly:\n{combined}"
+        );
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Failing silently would be worse than failing loudly: the UI would report
+    /// a governor change that never touched anything.
+    #[test]
+    fn no_writable_cpu_at_all_is_still_an_error() {
+        let (ok, output, _) = run_governor_script(&[0, 1], &[]);
+
+        assert!(!ok, "a total failure must surface:\n{output}");
+        assert!(
+            output.contains("no CPU accepted the governor"),
+            "should say why:\n{output}"
+        );
+    }
 
     #[test]
     fn accepts_plain_governor_names() {
