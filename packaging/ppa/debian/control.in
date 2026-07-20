@@ -32,10 +32,15 @@ Vcs-Git: https://github.com/vietanhdev/ThinkUtils.git
 Rules-Requires-Root: no
 
 Package: thinkutils
-# amd64 only, deliberately. thinkpad_acpi is an x86 platform driver and
-# ThinkPads are x86_64; claiming arm64 would commit Launchpad to builds nobody
-# can run.
-Architecture: amd64
+# `any`, not a list. This is the one channel that is multi-arch without naming
+# an architecture: Launchpad builds whatever the series has enabled, so the
+# mechanism is what matters and narrowing this to `amd64` would silently stop
+# producing arm64 builds with nothing else in the repo changing.
+#
+# Fan control needs thinkpad_acpi, which is x86-only; battery thresholds, the
+# CPU governor and the system monitor are architecture neutral and work on an
+# aarch64 ThinkPad such as the X13s.
+Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, policykit-1 | polkit
 Recommends: lm-sensors
 Suggests: clamav

@@ -107,6 +107,42 @@
   font-size: 0.95rem;
 }
 
+/* Architecture selector. Deliberately a visible pair of buttons rather than a
+   silent auto-detect: navigator.platform is deprecated and wrong under some
+   emulation layers, and handing someone the wrong architecture produces a
+   download that works and a package that will not install. */
+.dl-arch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.dl-arch-btn {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    color 0.2s;
+}
+
+.dl-arch-btn:hover {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-text-1);
+}
+
+.dl-arch-btn.active {
+  border-color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
+}
+
 .dl-grid {
   display: grid;
 

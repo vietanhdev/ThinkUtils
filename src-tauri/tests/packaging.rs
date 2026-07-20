@@ -145,12 +145,73 @@ fn packages_ship_the_polkit_rule_under_usr_share() {
     }
 }
 
-/// ThinkPads are x86_64 and thinkpad_acpi is an x86 platform driver. Claiming an
-/// architecture with no hardware to run on produces builds nobody can use.
+/// Every manifest must claim exactly the architectures release.yml actually
+/// builds.
+///
+/// The release matrix is the single source of truth, because it is the thing
+/// that produces artifacts. A manifest claiming an arch the matrix does not
+/// build commits a package repository to something that will never arrive; a
+/// manifest omitting one silently drops half the users a release was built for.
+/// Neither fails anything on its own -- the packages simply do not exist, and
+/// the download page keeps advertising them.
 #[test]
-fn packages_claim_x86_64_only() {
-    assert!(read("packaging/aur/PKGBUILD").contains("arch=('x86_64')"));
-    assert!(read("packaging/copr/thinkutils.spec").contains("ExclusiveArch:  x86_64"));
+fn packaging_architectures_match_what_release_actually_builds() {
+    let release = read(".github/workflows/release.yml");
+
+    // Read the arches out of the matrix rather than restating them here, so this
+    // cannot pass while disagreeing with the workflow it is meant to track.
+    let built: Vec<&str> = ["x86_64", "aarch64"]
+        .into_iter()
+        .filter(|a| release.contains(&format!("arch: {},", a)))
+        .collect();
+    assert_eq!(
+        built.len(),
+        2,
+        "expected release.yml to build x86_64 and aarch64, found {:?}",
+        built
+    );
+
+    let pkgbuild = read("packaging/aur/PKGBUILD");
+    for arch in &built {
+        assert!(
+            pkgbuild.contains(&format!("'{}'", arch)),
+            "PKGBUILD arch=() omits {}, which release.yml builds",
+            arch
+        );
+    }
+
+    let spec = read("packaging/copr/thinkutils.spec");
+    let exclusive = spec
+        .lines()
+        .find(|l| l.starts_with("ExclusiveArch:"))
+        .expect("spec declares ExclusiveArch");
+    for arch in &built {
+        assert!(
+            exclusive.contains(arch),
+            "spec ExclusiveArch omits {}: {}",
+            arch,
+            exclusive
+        );
+    }
+}
+
+/// The PPA is multi-arch without naming an architecture: Launchpad builds
+/// whatever the series enables. So assert the MECHANISM, not a list — narrowing
+/// this to `amd64` would silently stop producing arm64 builds with nothing else
+/// in the repo changing, and Launchpad reports per-arch results by email rather
+/// than failing anything here.
+#[test]
+fn debian_control_delegates_architecture_to_launchpad() {
+    let control = read("packaging/ppa/debian/control.in");
+    let arch_line = directives(&control)
+        .find(|l| l.starts_with("Architecture:"))
+        .expect("control.in declares an Architecture");
+
+    assert_eq!(
+        arch_line.trim(),
+        "Architecture: any",
+        "the PPA must delegate architecture to the series"
+    );
 }
 
 /// The version appears in the PKGBUILD and the spec as well as the four files

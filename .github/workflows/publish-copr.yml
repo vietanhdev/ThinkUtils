@@ -29,7 +29,7 @@ jobs:
           # Needed for the pushed-tag check below.
           git config --global --add safe.directory '*'
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Source0 points at the tag tarball, so a queued build 404s partway through
       # if the tag is not pushed. Cheaper to catch here than in the build log.
@@ -81,21 +81,61 @@ jobs:
           printf '%s\n' "$COPR_API_TOKEN" > ~/.config/copr
           chmod 600 ~/.config/copr
 
-          # The spec fetches crates during %build, which mock forbids by default.
-          # This is a property of the PROJECT, not the spec, so it does not
-          # travel with the repository -- hence setting it on every publish
-          # rather than assuming someone did it once.
+          # Chroots resolved rather than hardcoded -- a fixed list goes stale
+          # every six months when Fedora branches.
+          #
+          # Selected PER ARCHITECTURE, and that structure is load-bearing rather
+          # than stylistic. The obvious one-liner -- widening the regex to
+          # (x86_64|aarch64) and keeping `tail -3` -- takes the last three of the
+          # COMBINED list, so "newest three releases" silently becomes "newest
+          # three chroots across both arches". Checked against a realistic chroot
+          # list, that yields fedora-42-x86_64, fedora-43-aarch64,
+          # fedora-43-x86_64: two releases of one arch, one of the other, and
+          # fedora-41 dropped entirely. Which arch loses coverage shifts every
+          # time Fedora branches, and it exits 0 either way.
+          #
+          # This list must stay in step with ExclusiveArch in the spec: a chroot
+          # for an arch the spec excludes is a build that fails, and an arch in
+          # the spec with no chroot here is simply never built. Widening
+          # ExclusiveArch alone ships nothing.
+          COPR_ARCHES=(x86_64 aarch64)
+          CHROOTS=()
+          for a in "${COPR_ARCHES[@]}"; do
+            mapfile -t arch_chroots < <(copr-cli list-chroots 2>/dev/null \
+              | grep -E "^fedora-[0-9]+-${a}$" | sort -V | tail -3)
+            if [ "${#arch_chroots[@]}" -eq 0 ]; then
+              echo "::error::no active fedora ${a} chroots found - ${a} would silently never build"
+              exit 1
+            fi
+            CHROOTS+=("${arch_chroots[@]}")
+          done
+          echo "chroots: ${CHROOTS[*]}"
+
+          # `copr-cli list` prints "Name: <project>" plus an indented block, not a
+          # bare name, so grepping for the name alone never matches and the script
+          # tries to create a project that already exists.
+          if ! copr-cli list 2>/dev/null | grep -qE "^Name:[[:space:]]+thinkutils$"; then
+            echo ">> creating COPR project thinkutils"
+            # Separate argv entries. "${CHROOTS[@]/#/--chroot }" looks equivalent
+            # but puts the space INSIDE one argument, so copr-cli sees a single
+            # unrecognised "--chroot fedora-43-x86_64" token and bails.
+            CHROOT_ARGS=()
+            for c in "${CHROOTS[@]}"; do CHROOT_ARGS+=(--chroot "${c}"); done
+            copr-cli create thinkutils "${CHROOT_ARGS[@]}" \
+              --description "ThinkPad fan control, battery care and system monitoring" \
+              --enable-net on
+          fi
+
+          # --enable-net is REQUIRED, not cosmetic: mock disables builder
+          # networking by default and the spec fetches crates during %build.
+          # It is a property of the PROJECT, so it does not travel with the
+          # repository -- hence setting it on every publish rather than trusting
+          # that someone did it once.
           copr-cli modify thinkutils --enable-net on || \
             echo "::warning::could not set --enable-net; the build will fail if it is off"
 
-          # Newest three x86_64 chroots, resolved rather than hardcoded: a fixed
-          # list goes stale every six months when Fedora branches.
-          chroots=$(copr-cli list-chroots 2>/dev/null \
-            | grep -E '^fedora-[0-9]+-x86_64$' | sort -V | tail -3)
-          echo "chroots: ${chroots}"
-
           args=()
-          for c in ${chroots}; do args+=(-r "$c"); done
+          for c in "${CHROOTS[@]}"; do args+=(-r "$c"); done
 
           copr-cli build "${args[@]}" thinkutils "${SRPM}"
 

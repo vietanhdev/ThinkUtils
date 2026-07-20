@@ -45,7 +45,7 @@ jobs:
   version-consistency:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # One script owns the list, so adding a packaging file cannot leave CI
       # checking a stale subset of it.
       - name: Check every version declaration agrees
@@ -56,10 +56,10 @@ jobs:
   frontend:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
       # npm ci, not npm install: install can resolve a tree the lockfile does not
@@ -76,7 +76,7 @@ jobs:
         # Not a workspace: the manifest lives under src-tauri/.
         working-directory: src-tauri
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -110,7 +110,7 @@ jobs:
   audit:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo install cargo-audit --locked
 
@@ -140,7 +140,7 @@ jobs:
   distro-detection:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Re-fetch os-release from live distro images
         run: |
@@ -219,7 +219,7 @@ jobs:
   hardware-simulation:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -291,9 +291,31 @@ jobs:
   #
   # So: build in the container, hand the artifacts to a normal runner, and let
   # that runner drive Docker.
+  #
+  # Two architectures, built NATIVELY on their own runner. `runs-on` picks the
+  # CPU; `container` pins the glibc floor. Those are separate concerns and the
+  # split is what makes this work: ubuntu-24.04-arm gives real aarch64 hardware
+  # (free for public repos), while ubuntu:22.04 -- a multi-arch image -- keeps
+  # the floor at 2.35 on both.
+  #
+  # NOT cross-compiled, deliberately. Tauri's bundlers infer the architecture
+  # from the build host and declare none in the manifest, so `--target
+  # aarch64-...` would stage host artifacts under an aarch64 name and ship an
+  # x86_64 binary in an arm64 package. No QEMU either: emulating a WebKit GUI is
+  # slow and fails on graphics paths no real user touches, so a red result would
+  # be uninformative.
   bundle:
     needs: [rust, frontend]
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      # One arch failing should name that arch rather than cancel its sibling and
+      # hide how far the damage goes.
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, deb_arch: amd64, runner: ubuntu-24.04 }
+          - { arch: aarch64, deb_arch: arm64, runner: ubuntu-24.04-arm }
+    name: bundle (${{ matrix.arch }})
     container:
       image: ubuntu:22.04
     defaults:
@@ -316,14 +338,34 @@ jobs:
             librsvg2-dev patchelf xdg-utils
           git config --global --add safe.directory "${GITHUB_WORKSPACE}"
 
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # The arch axis is only worth having if it is real. If GitHub renames or
+      # withdraws the arm label, `runs-on` silently falls back and this job would
+      # build x86_64 twice, publish it under an arm64 name, and stay green --
+      # the arm64 half of a channel the download page advertises, untested and
+      # indistinguishable from working.
+      - name: This runner really is ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          actual="$(uname -m)"
+          if [ "${actual}" != "${{ matrix.arch }}" ]; then
+            echo "::error::matrix says ${{ matrix.arch }} but this runner is ${actual} - the arch axis is not testing what it claims"
+            exit 1
+          fi
+          echo "confirmed ${actual}"
+
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          # Explicit even though the action folds the matrix into its own key: an
+          # x86_64 cache restored into an aarch64 build poisons target/ with
+          # foreign object files, and the link error that follows points nowhere
+          # near the cause.
+          key: ${{ matrix.arch }}
 
       - run: npm ci
 
@@ -349,9 +391,12 @@ jobs:
               exit 1 ;;
           esac
 
-      - uses: actions/upload-artifact@v4
+      # Per-arch name: a single `packages` artifact would have the two matrix
+      # legs racing to overwrite each other, and the loser's packages would
+      # simply not exist with nothing reporting it.
+      - uses: actions/upload-artifact@v7
         with:
-          name: packages
+          name: packages-${{ matrix.arch }}
           path: |
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/rpm/*.rpm
@@ -361,16 +406,44 @@ jobs:
   # Everything above proves the code COMPILES. Not one job starts the app. A
   # Tauri binary can pass every check here and still die on launch with a dlopen
   # panic, or come up showing an empty window because the frontend never mounted.
+  #
+  # Run on both arches, and NOT with a thinner arm64 leg. The whole point of the
+  # arm64 rows is to catch a distro/arch interaction, which is exactly what a
+  # reduced matrix would be most likely to miss.
+  #
+  # This is also where arm64 is genuinely proven rather than assumed.
+  # JavaScriptCore has its own arm64 JIT, so "the native shell paints but the JS
+  # never runs" is an arch-specific failure mode -- and a screenshot of it looks
+  # like a working window. The OCR step is what distinguishes them: a blank-but-
+  # styled window still has hundreds of distinct colours, and only the absence of
+  # rendered TEXT gives it away.
   gui-launch:
     needs: bundle
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, runner: ubuntu-24.04 }
+          - { arch: aarch64, runner: ubuntu-24.04-arm }
+    name: gui-launch (${{ matrix.arch }})
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - name: This runner really is ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          actual="$(uname -m)"
+          if [ "${actual}" != "${{ matrix.arch }}" ]; then
+            echo "::error::matrix says ${{ matrix.arch }} but this runner is ${actual} - the arch axis is not testing what it claims"
+            exit 1
+          fi
+          echo "confirmed ${actual}"
+
+      - uses: actions/download-artifact@v8
         with:
-          name: packages
+          name: packages-${{ matrix.arch }}
           path: artifacts
 
       # The script expects Tauri's bundle layout, not a flat artifact directory.
@@ -392,9 +465,9 @@ jobs:
       # just whatever reached stdout before the container was discarded.
       - name: Upload screenshots, OCR text and app logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: gui-launch-evidence
+          name: gui-launch-evidence-${{ matrix.arch }}
           path: build/gui-test-out/
           if-no-files-found: warn
           retention-days: 14
@@ -405,10 +478,10 @@ jobs:
   docs:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci

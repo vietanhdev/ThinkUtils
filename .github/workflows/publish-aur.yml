@@ -28,7 +28,7 @@ jobs:
           set -euo pipefail
           pacman -Sy --noconfirm --needed base-devel git openssh pacman-contrib jq
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The tag must exist and be pushed BEFORE publishing: PKGBUILD's source
       # points at the tag tarball, so a queued build would 404 partway through

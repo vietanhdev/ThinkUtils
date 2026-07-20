@@ -36,15 +36,38 @@ function find(pred) {
   return release.value?.assets?.find((a) => pred(a.name)) ?? null;
 }
 
-// Each predicate pins the architecture suffix. ThinkUtils ships x86_64 only
-// today, but `find` returns the FIRST match, so a loose predicate would silently
-// hand out the wrong package the moment a second architecture is added. The
-// failure would be user-side and quiet: the page looks right, the download works,
-// and the package refuses to install.
+// Releases now carry two architectures, which is exactly the case the previous
+// comment here warned about: `find` returns the FIRST match, so a predicate that
+// did not pin the suffix would hand an arm64 user an x86_64 package. That fails
+// quietly on the user's side — the page looks right, the download works, and the
+// package refuses to install.
+//
+// So the suffix stays pinned, and the arch becomes an explicit choice.
+const ARCHES = {
+  x86_64: { label: "Intel / AMD (x86_64)", deb: "amd64", rpm: "x86_64" },
+  aarch64: { label: "ARM (aarch64)", deb: "arm64", rpm: "aarch64" },
+};
+
+// Guessed, never assumed. navigator.platform is deprecated and lies under some
+// emulation layers, so it only picks the DEFAULT tab — both architectures stay
+// one click away rather than being hidden behind a detection that can be wrong.
+function detectArch() {
+  const s = `${navigator.userAgent} ${navigator.platform ?? ""}`.toLowerCase();
+  if (/aarch64|arm64/.test(s)) return "aarch64";
+  return "x86_64";
+}
+
+const arch = ref("x86_64");
+onMounted(() => {
+  arch.value = detectArch();
+});
+
+const suffix = computed(() => ARCHES[arch.value]);
+
 const is = {
-  deb: (n) => n.endsWith("_amd64.deb"),
-  rpm: (n) => n.endsWith(".x86_64.rpm"),
-  appimage: (n) => n.endsWith("_amd64.AppImage"),
+  deb: (n) => n.endsWith(`_${suffix.value.deb}.deb`),
+  rpm: (n) => n.endsWith(`.${suffix.value.rpm}.rpm`),
+  appimage: (n) => n.endsWith(`_${suffix.value.deb}.AppImage`),
 };
 
 // Always yields a working link: the direct asset once a release exists, the
@@ -70,12 +93,34 @@ function size(pred) {
   <template v-else>Looking up the latest release…</template>
 </p>
 
-For **Lenovo ThinkPad** laptops running Linux on **x86_64**. Built on Ubuntu 22.04
-(glibc 2.35), so it runs on **Ubuntu 22.04+, Debian 12+ and Fedora 36+**.
+For **Lenovo ThinkPad** laptops running Linux on **x86_64 or ARM (aarch64)**.
+Built on Ubuntu 22.04 (glibc 2.35), so it runs on **Ubuntu 22.04+, Debian 12+ and
+Fedora 36+**.
 
 Every release is installed into a clean container and launched under a virtual
-display before it ships — on Ubuntu 22.04 and 24.04, Debian 12, and Fedora 41 —
-with a screenshot checked by OCR to confirm the interface actually rendered.
+display before it ships — on Ubuntu 22.04 and 24.04, Debian 12, and Fedora 41,
+**on both architectures, on real hardware rather than emulation** — with a
+screenshot checked by OCR to confirm the interface actually rendered.
+
+<div class="dl-arch">
+  <button
+    v-for="(a, key) in ARCHES"
+    :key="key"
+    class="dl-arch-btn"
+    :class="{ active: arch === key }"
+    @click="arch = key"
+  >{{ a.label }}</button>
+</div>
+
+::: warning Fan control is x86_64 only
+On ARM ThinkPads (the X13s and similar) everything works **except fan control**.
+That is a kernel limitation, not an app one: fan control goes through
+`thinkpad_acpi`, which is an x86 platform driver and does not exist on ARM.
+
+Battery charge thresholds, CPU governor, power profiles and system monitoring all
+work normally — the app detects the missing fan interface and says so rather than
+appearing broken.
+:::
 
 <div class="dl-grid">
   <a class="dl-card" :href="url(is.deb)">
@@ -93,15 +138,15 @@ with a screenshot checked by OCR to confirm the interface actually rendered.
 </div>
 
 ```bash
-# Debian / Ubuntu
-sudo apt install ./thinkutils_*_amd64.deb
+# Debian / Ubuntu — the glob matches whichever architecture you downloaded
+sudo apt install ./thinkutils_*.deb
 
 # Fedora / RHEL
-sudo dnf install ./thinkutils-*.x86_64.rpm
+sudo dnf install ./thinkutils-*.rpm
 
 # AppImage — portable, nothing to install
-chmod +x thinkutils_*_amd64.AppImage
-./thinkutils_*_amd64.AppImage
+chmod +x thinkutils_*.AppImage
+./thinkutils_*.AppImage
 ```
 
 ::: tip Use `apt install ./file.deb`, not `dpkg -i`

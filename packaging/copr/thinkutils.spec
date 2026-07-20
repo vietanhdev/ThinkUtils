@@ -28,9 +28,15 @@ Requires:       polkit
 
 Recommends:     lm_sensors
 
-# thinkpad_acpi is an x86 platform driver; there is no ThinkPad to run this on
-# anywhere else.
-ExclusiveArch:  x86_64
+# Fan control needs thinkpad_acpi, which is x86-only. Everything else -- battery
+# thresholds via the generic power_supply API, CPU governor, system monitor --
+# is architecture neutral and works on an aarch64 ThinkPad such as the X13s.
+#
+# Widening this alone does NOT ship aarch64: COPR builds only the chroots the
+# project has enabled, so the aarch64 chroots have to be enabled on the COPR
+# project too. A spec claiming an arch the project cannot build for produces
+# nothing, silently.
+ExclusiveArch:  x86_64 aarch64
 
 %description
 ThinkUtils is a desktop utility for Lenovo ThinkPad laptops running Linux,

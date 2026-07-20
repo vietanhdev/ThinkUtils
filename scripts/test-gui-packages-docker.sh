@@ -59,14 +59,57 @@ trap 'rm -rf "${STAGE}"' EXIT
 
 mkdir -p "${OUTDIR}"
 
-# ThinkPads are x86_64. There is deliberately no arm64 matrix and no qemu:
-# emulating a WebKit GUI is slow and fails on graphics paths no user touches, so
-# a red result would be uninformative rather than useful.
+# Runs on whatever architecture it is invoked on, NATIVELY. CI drives it once per
+# arch on a matching runner (ubuntu-24.04 / ubuntu-24.04-arm).
+#
+# Never under qemu: emulating a WebKit GUI is slow and fails on graphics paths no
+# real user touches, so a red result would be uninformative rather than useful.
+# Refuse rather than produce that result, since a misleading failure is worse
+# than no coverage -- people learn to ignore the job.
 ARCH="$(uname -m)"
-if [ "${ARCH}" != "x86_64" ]; then
-    echo "ERROR: this suite is x86_64-only (got ${ARCH})" >&2
-    exit 1
+case "${ARCH}" in
+    x86_64 | aarch64) ;;
+    *)
+        echo "ERROR: unsupported architecture ${ARCH} (expected x86_64 or aarch64)" >&2
+        exit 1
+        ;;
+esac
+
+if [ -e /proc/sys/fs/binfmt_misc/qemu-aarch64 ] || [ -e /proc/sys/fs/binfmt_misc/qemu-x86_64 ]; then
+    echo "WARNING: qemu binfmt handlers are registered on this host." >&2
+    echo "         If these containers are emulated, failures here are not real." >&2
 fi
+
+# Each packaging format spells the architecture differently, and Tauri's bundlers
+# take it from the build host rather than from any manifest. Deriving all three
+# from `uname -m` keeps the artifact patterns below honest on either runner --
+# hardcoding amd64/x86_64 made them match nothing on aarch64, which stage_one
+# reports as "no artifact" rather than as an unsupported architecture.
+# All three differ, and AppImage is the trap: it follows the DEB convention on
+# x86_64 (amd64) but the RPM convention on aarch64 (aarch64, not arm64). So it
+# cannot be derived from either of the others, and a script that reuses DEB_ARCH
+# for it is correct on x86_64 by coincidence and broken on ARM. That is exactly
+# how it shipped -- the mismatch is invisible until something actually runs the
+# suite on aarch64.
+#
+#   format      x86_64    aarch64
+#   .deb        amd64     arm64
+#   .rpm        x86_64    aarch64
+#   .AppImage   amd64     aarch64
+case "${ARCH}" in
+    x86_64)
+        DEB_ARCH=amd64
+        RPM_ARCH=x86_64
+        APPIMAGE_ARCH=amd64
+        ;;
+    aarch64)
+        DEB_ARCH=arm64
+        RPM_ARCH=aarch64
+        APPIMAGE_ARCH=aarch64
+        ;;
+esac
+
+echo "architecture: ${ARCH} (deb: ${DEB_ARCH}, rpm: ${RPM_ARCH}, appimage: ${APPIMAGE_ARCH})"
 
 shopt -s nullglob
 
@@ -427,7 +470,7 @@ for spec in "${TARGETS[@]}"; do
 
     case "${kind}" in
         deb)
-            pkg="$(stage_one "thinkutils_VERSION_amd64.deb")" || { overall=1; continue; }
+            pkg="$(stage_one "thinkutils_VERSION_${DEB_ARCH}.deb")" || { overall=1; continue; }
             docker run --rm -v "${STAGE}:/a:ro" -v "${tout}:/out" "${image:-ubuntu:24.04}" bash -c "
               set -u
               export DEBIAN_FRONTEND=noninteractive
@@ -443,7 +486,7 @@ for spec in "${TARGETS[@]}"; do
             "
             ;;
         rpm)
-            pkg="$(stage_one "thinkutils-VERSION-*.x86_64.rpm")" || { overall=1; continue; }
+            pkg="$(stage_one "thinkutils-VERSION-*.${RPM_ARCH}.rpm")" || { overall=1; continue; }
             docker run --rm -v "${STAGE}:/a:ro" -v "${tout}:/out" "${image:-fedora:41}" bash -c "
               set -u
               ${RETRY}
@@ -460,7 +503,7 @@ for spec in "${TARGETS[@]}"; do
             # --appimage-extract rather than a direct run: mounting an AppImage
             # needs FUSE, which a container does not have. Extraction exercises
             # the same payload.
-            pkg="$(stage_one "thinkutils_VERSION_amd64.AppImage")" || { overall=1; continue; }
+            pkg="$(stage_one "thinkutils_VERSION_${APPIMAGE_ARCH}.AppImage")" || { overall=1; continue; }
             docker run --rm -v "${STAGE}:/a:ro" -v "${tout}:/out" "${image:-ubuntu:22.04}" bash -c "
               set -u
               export DEBIAN_FRONTEND=noninteractive
