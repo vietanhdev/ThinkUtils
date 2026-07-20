@@ -1,14 +1,29 @@
 Package: thinkutils
-Version: 0.1.10
+Version: 0.2.0
+Architecture: arm64
+Maintainer: Viet Anh Nguyen
+Installed-Size: 28321
+Depends: libayatana-appindicator3-1, libwebkit2gtk-4.1-0, libgtk-3-0
+Filename: ./thinkutils_v0.2.0_arm64.deb
+Size: 8996660
+MD5sum: f2c05fd3415c9bd03b4aa2e203269883
+SHA1: 36363192d26640995f2ba71304dd5c5f30899f5a
+SHA256: 62df8173be1dc7d8de7152e554b916689def47d196c00c220aca12f890cb34ec
+Priority: optional
+Description: ThinkPad utilities for Linux - Fan control, battery management, and system monitoring
+ (none)
+
+Package: thinkutils
+Version: 0.2.0
 Architecture: amd64
 Maintainer: Viet Anh Nguyen
-Installed-Size: 24882
+Installed-Size: 29713
 Depends: libayatana-appindicator3-1, libwebkit2gtk-4.1-0, libgtk-3-0
-Filename: ./thinkutils_v0.1.10_amd64.deb
-Size: 8283592
-MD5sum: d9942429110af8063878f1211a8de5b5
-SHA1: 57d9bfc799042b8b9c485dabab83bbb3efa788fb
-SHA256: cb876182b21d8e226adf9b4e70469ee231e4d2306f5042009ea26d0116008480
+Filename: ./thinkutils_v0.2.0_amd64.deb
+Size: 8774198
+MD5sum: 1f0872690c6f804345a02cca39d0ed46
+SHA1: cccf2a9a6f6931c95ae54d5977d3896fa2ce6f2d
+SHA256: 0ad6b19d05618e20aeb47dee13a387ec70e408961ca2ece9d532948b4362d2cf
 Priority: optional
 Description: ThinkPad utilities for Linux - Fan control, battery management, and system monitoring
  (none)

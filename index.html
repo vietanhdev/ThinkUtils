@@ -5,7 +5,9 @@
 <h1>ThinkUtils APT Repository</h1>
 <p>Add this repository to install ThinkUtils via apt:</p>
 <pre>
-echo "deb [trusted=yes] https://gh.vietanh.dev/ThinkUtils/apt ./" | sudo tee /etc/apt/sources.list.d/thinkutils.list
+curl -fsSL https://gh.vietanh.dev/ThinkUtils/apt/thinkutils-archive-keyring.asc \
+  | sudo gpg --dearmor -o /usr/share/keyrings/thinkutils-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/thinkutils-archive-keyring.gpg] https://gh.vietanh.dev/ThinkUtils/apt ./" | sudo tee /etc/apt/sources.list.d/thinkutils.list
 sudo apt update
 sudo apt install thinkutils
 </pre>
