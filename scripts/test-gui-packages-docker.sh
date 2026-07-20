@@ -85,18 +85,31 @@ fi
 # from `uname -m` keeps the artifact patterns below honest on either runner --
 # hardcoding amd64/x86_64 made them match nothing on aarch64, which stage_one
 # reports as "no artifact" rather than as an unsupported architecture.
+# All three differ, and AppImage is the trap: it follows the DEB convention on
+# x86_64 (amd64) but the RPM convention on aarch64 (aarch64, not arm64). So it
+# cannot be derived from either of the others, and a script that reuses DEB_ARCH
+# for it is correct on x86_64 by coincidence and broken on ARM. That is exactly
+# how it shipped -- the mismatch is invisible until something actually runs the
+# suite on aarch64.
+#
+#   format      x86_64    aarch64
+#   .deb        amd64     arm64
+#   .rpm        x86_64    aarch64
+#   .AppImage   amd64     aarch64
 case "${ARCH}" in
     x86_64)
         DEB_ARCH=amd64
         RPM_ARCH=x86_64
+        APPIMAGE_ARCH=amd64
         ;;
     aarch64)
         DEB_ARCH=arm64
         RPM_ARCH=aarch64
+        APPIMAGE_ARCH=aarch64
         ;;
 esac
 
-echo "architecture: ${ARCH} (deb: ${DEB_ARCH}, rpm: ${RPM_ARCH})"
+echo "architecture: ${ARCH} (deb: ${DEB_ARCH}, rpm: ${RPM_ARCH}, appimage: ${APPIMAGE_ARCH})"
 
 shopt -s nullglob
 
@@ -490,7 +503,7 @@ for spec in "${TARGETS[@]}"; do
             # --appimage-extract rather than a direct run: mounting an AppImage
             # needs FUSE, which a container does not have. Extraction exercises
             # the same payload.
-            pkg="$(stage_one "thinkutils_VERSION_${DEB_ARCH}.AppImage")" || { overall=1; continue; }
+            pkg="$(stage_one "thinkutils_VERSION_${APPIMAGE_ARCH}.AppImage")" || { overall=1; continue; }
             docker run --rm -v "${STAGE}:/a:ro" -v "${tout}:/out" "${image:-ubuntu:22.04}" bash -c "
               set -u
               export DEBIAN_FRONTEND=noninteractive
