@@ -95,11 +95,32 @@ jobs:
             exit 1
           fi
 
-          install -d -m 700 ~/.ssh
-          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
-          chmod 600 ~/.ssh/aur
-          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts 2>/dev/null
-          printf 'Host aur.archlinux.org\n  IdentityFile ~/.ssh/aur\n  User aur\n' > ~/.ssh/config
+          # Absolute paths and an explicit GIT_SSH_COMMAND, rather than ~/.ssh
+          # plus a config file. The shell and the ssh that git spawns each
+          # resolve ~ from HOME independently, and in a container that is one
+          # more thing that can silently differ -- the failure then arrives as
+          # "Host key verification failed", which points at the host key rather
+          # than at path resolution.
+          key=/tmp/aur_id
+          hosts=/tmp/aur_known_hosts
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > "$key"
+          chmod 600 "$key"
+
+          # AUR is reached over SSH, so its host key has to be known before git
+          # will connect. ssh-keyscan can return NOTHING and still exit 0, and
+          # the previous 2>/dev/null hid why -- so assert the result instead of
+          # assuming it.
+          ssh-keyscan -t rsa,ecdsa,ed25519 aur.archlinux.org > "$hosts" 2>/tmp/keyscan.err || true
+          if [ ! -s "$hosts" ]; then
+            echo "::error::ssh-keyscan returned no host keys for aur.archlinux.org - cannot verify the host to push to"
+            cat /tmp/keyscan.err >&2 || true
+            exit 1
+          fi
+          echo "host keys fetched: $(wc -l < "$hosts")"
+
+          # IdentitiesOnly stops ssh offering any other key it happens to find
+          # and being rejected before it reaches this one.
+          export GIT_SSH_COMMAND="ssh -i ${key} -o IdentitiesOnly=yes -o UserKnownHostsFile=${hosts} -o StrictHostKeyChecking=yes"
 
           git config --global user.name "Viet Anh Nguyen"
           git config --global user.email "vietanh.dev@gmail.com"
