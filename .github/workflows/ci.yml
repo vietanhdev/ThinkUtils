@@ -11,10 +11,25 @@ on:
   workflow_call:
 
 # A force-push or a quick second commit should cancel the superseded run rather
-# than queue behind it. Never cancel on main: those runs record what shipped.
+# than queue behind it. Runs on main must NEVER be cancelled: they are the only
+# record that what shipped was green.
+#
+# The obvious spelling of that does not work:
+#
+#   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+#
+# The expression renders to the STRING "false", and a non-empty string is
+# truthy here, so main was cancelled anyway. It failed silently and in exactly
+# the case that matters -- merging two PRs in quick succession killed the first
+# one's run. Four main runs were cancelled before this was noticed, each with
+# zero jobs recorded, leaving those commits with no evidence they ever built.
+#
+# Encoding the rule in the GROUP instead is unambiguous: on main the SHA makes
+# every run its own group, so there is never a run to supersede. On any other
+# ref the group is per-ref as before, so a new push still cancels the old run.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || 'shared' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
