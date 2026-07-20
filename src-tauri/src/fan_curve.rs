@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_store::StoreExt;
 use tokio::time::sleep;
@@ -225,7 +225,8 @@ fn get_cpu_temperature() -> Result<i32, String> {
 ///
 /// Shared with the helper script's whitelist, which only accepts this exact
 /// value. thinkpad_acpi's watchdog is one-shot and only rearms when it receives
-/// a fan command, so it is re-armed on every level change rather than once.
+/// a fan command, so it is re-armed on a timer — see [`watchdog_due`] for why
+/// re-arming on level change alone was not enough.
 use crate::fan_control::FAN_WATCHDOG_SECS;
 
 /// Hand the fan back to firmware control.
@@ -247,6 +248,21 @@ async fn restore_fan_to_auto() {
 /// the command, and a failure here must not stop the curve from running.
 async fn arm_fan_watchdog() {
     let _ = write_fan_command(&format!("watchdog {}", FAN_WATCHDOG_SECS)).await;
+}
+
+/// Whether the firmware watchdog is due to be re-armed.
+///
+/// The watchdog is one-shot: it counts down from the last fan command and hands
+/// the fan back to the firmware when it reaches zero. Re-arming only on level
+/// change looks right, but a curve sitting at a steady temperature issues no fan
+/// commands at all — so the fan silently reverted to automatic control roughly
+/// [`FAN_WATCHDOG_SECS`] after the temperature settled, which is the *common*
+/// case rather than an edge case. `last_level` still matched the target, so
+/// nothing rewrote it and the UI went on reporting the curve as active.
+///
+/// Re-armed at half the interval so one slow or skipped tick cannot expire it.
+fn watchdog_due(since_last_arm: Duration) -> bool {
+    since_last_arm >= Duration::from_secs((FAN_WATCHDOG_SECS / 2) as u64)
 }
 
 /// Synchronous counterpart to [`restore_fan_to_auto`], for the app exit handler.
@@ -334,6 +350,7 @@ async fn write_fan_command(command: &str) -> Result<(), String> {
 pub async fn fan_curve_background_task(app: AppHandle) {
     let state = app.state::<FanCurveState>();
     let mut last_level: Option<i32> = None;
+    let mut last_armed: Option<Instant> = None;
     let mut error_count = 0;
     let mut permission_error_reported = false;
     const MAX_ERRORS: i32 = 5;
@@ -359,6 +376,7 @@ pub async fn fan_curve_background_task(app: AppHandle) {
                 restore_fan_to_auto().await;
             }
             last_level = None;
+            last_armed = None;
             permission_error_reported = false;
             continue;
         }
@@ -380,6 +398,7 @@ pub async fn fan_curve_background_task(app: AppHandle) {
                     eprintln!("[Fan Curve] Temperature unreadable — returning fan to auto");
                     restore_fan_to_auto().await;
                     last_level = None;
+                    last_armed = None;
                     let _ = app.emit_to(
                         "main",
                         "fan-curve-error",
@@ -408,6 +427,7 @@ pub async fn fan_curve_background_task(app: AppHandle) {
                     last_level = Some(target_level);
                     permission_error_reported = false;
                     arm_fan_watchdog().await;
+                    last_armed = Some(Instant::now());
                 }
                 Err(e) => {
                     eprintln!("[Fan Curve] Failed to set fan speed: {}", e);
@@ -425,6 +445,11 @@ pub async fn fan_curve_background_task(app: AppHandle) {
                     }
                 }
             }
+        } else if last_level.is_some() && last_armed.is_none_or(|t| watchdog_due(t.elapsed())) {
+            // Holding a level still counts as steering the fan, so the watchdog
+            // has to be kept alive even though nothing is being changed.
+            arm_fan_watchdog().await;
+            last_armed = Some(Instant::now());
         }
 
         // Always emit temperature and current level to frontend for live UI updates
@@ -445,6 +470,77 @@ pub async fn fan_curve_background_task(app: AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The regression this exists for: the curve re-armed the watchdog only when
+    /// the level changed, so a machine sitting at a steady temperature issued no
+    /// fan commands and the firmware took the fan back after FAN_WATCHDOG_SECS.
+    ///
+    /// The loop ticks every 2s, so this asserts the re-arm lands with room to
+    /// spare rather than on the exact boundary.
+    #[test]
+    fn watchdog_is_rearmed_well_before_the_firmware_gives_up() {
+        let expiry = Duration::from_secs(FAN_WATCHDOG_SECS as u64);
+
+        assert!(
+            !watchdog_due(Duration::from_secs(0)),
+            "no re-arm needed immediately after arming"
+        );
+
+        let due_at = (1..=FAN_WATCHDOG_SECS as u64)
+            .map(Duration::from_secs)
+            .find(|d| watchdog_due(*d))
+            .expect("must become due before the firmware watchdog expires");
+
+        assert!(
+            due_at < expiry,
+            "re-arm becomes due at {:?} but the firmware gives up at {:?}",
+            due_at,
+            expiry
+        );
+
+        // At least one full 2s tick has to fit between "due" and "expired",
+        // otherwise a single slow iteration loses the fan.
+        assert!(
+            expiry - due_at >= Duration::from_secs(2),
+            "only {:?} of slack between due ({:?}) and expiry ({:?}) - one \
+             delayed tick would let the watchdog fire",
+            expiry - due_at,
+            due_at,
+            expiry
+        );
+    }
+
+    /// A level held across many ticks is the case that used to silently stop
+    /// steering the fan, so walk the actual loop cadence rather than a single
+    /// duration.
+    #[test]
+    fn holding_one_level_still_keeps_the_watchdog_alive() {
+        const TICK: u64 = 2;
+        let mut since_arm = Duration::from_secs(0);
+        let mut rearms = 0;
+
+        // Five minutes at a dead-steady temperature: no level change, ever.
+        for _ in 0..(300 / TICK) {
+            since_arm += Duration::from_secs(TICK);
+            if watchdog_due(since_arm) {
+                rearms += 1;
+                since_arm = Duration::from_secs(0);
+            }
+            assert!(
+                since_arm < Duration::from_secs(FAN_WATCHDOG_SECS as u64),
+                "watchdog went {:?} without a re-arm - the fan would have \
+                 reverted to firmware control",
+                since_arm
+            );
+        }
+
+        assert!(
+            rearms >= 9,
+            "expected roughly one re-arm per {}s over 5 minutes, got {}",
+            FAN_WATCHDOG_SECS / 2,
+            rearms
+        );
+    }
 
     #[test]
     fn test_calculate_fan_level() {
