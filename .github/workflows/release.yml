@@ -16,21 +16,67 @@ jobs:
   ci:
     uses: ./.github/workflows/ci.yml
 
-  build-and-release:
+  # Two architectures, built NATIVELY on their own runner.
+  #
+  # `runs-on` picks the CPU, `container` pins the glibc floor -- separate
+  # concerns, and separating them is what fixes the long-standing note here.
+  # Tauri's deb bundler reads the floor off the BUILD HOST, so building on 24.04
+  # (glibc 2.39) emits a package declaring libc6 (>= 2.39), which apt then
+  # refuses on Ubuntu 22.04 (2.35) and Debian 12 (2.36). That was previously
+  # pinned by staying on the `ubuntu-22.04` runner label, which GitHub is
+  # deprecating; `container: ubuntu:22.04` makes the floor ours to choose rather
+  # than GitHub's to withdraw, and works identically on both arches because the
+  # image is multi-arch.
+  #
+  # NOT cross-compiled: Tauri's bundlers infer the architecture from the build
+  # host and declare none in the manifest, so `--target aarch64-...` would stage
+  # host artifacts under an aarch64 name and ship an x86_64 binary in an arm64
+  # package.
+  build:
     needs: ci
-    # Deliberately NOT bumped to ubuntu-24.04 despite 22.04's deprecation.
-    # Tauri's deb bundler reads the glibc floor off the BUILD HOST, so building
-    # on 24.04 (glibc 2.39) emits a package declaring libc6 (>= 2.39), which apt
-    # then refuses to install on Ubuntu 22.04 (2.35) and Debian 12 (2.36).
-    # Nothing about that is visible at build time -- it surfaces as a broken
-    # download for users. The correct fix is runs-on: ubuntu-24.04 with
-    # container: ubuntu:22.04, so the floor is ours to pin rather than GitHub's
-    # to deprecate. Tracked separately; do not "just bump the runner".
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: write
-    
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, deb_arch: amd64, rpm_arch: x86_64, file_arch: "x86-64", runner: ubuntu-24.04 }
+          - { arch: aarch64, deb_arch: arm64, rpm_arch: aarch64, file_arch: "ARM aarch64", runner: ubuntu-24.04-arm }
+    name: build (${{ matrix.arch }})
+    container:
+      image: ubuntu:22.04
+    defaults:
+      run:
+        shell: bash
+    timeout-minutes: 90
+
     steps:
+      # Before checkout: the action needs git inside the container, and running
+      # as root over a runner-owned workspace trips git's dubious-ownership guard.
+      - name: Bootstrap the 22.04 build image
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl wget file git jq pkg-config build-essential \
+            libssl-dev rpm xz-utils sudo binutils \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf xdg-utils
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
+      # If GitHub renames or withdraws the arm label, `runs-on` falls back and
+      # this job would build x86_64 twice and publish it under an arm64 name,
+      # staying green. Users on arm64 would install a package that cannot run.
+      - name: This runner really is ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          actual="$(uname -m)"
+          if [ "${actual}" != "${{ matrix.arch }}" ]; then
+            echo "::error::matrix says ${{ matrix.arch }} but this runner is ${actual} - refusing to publish a mislabelled package"
+            exit 1
+          fi
+          echo "confirmed ${actual}"
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -42,23 +88,22 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          # An x86_64 cache restored into an aarch64 build poisons target/ with
+          # foreign objects, and the resulting link error points nowhere near it.
+          key: ${{ matrix.arch }}
 
       - name: Install npm dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build Tauri app
+        # linuxdeploy is itself an AppImage and mounts via FUSE, which a container
+        # does not have. Without this the bundle dies on a fuse error AFTER the
+        # .deb and .rpm have already built.
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
         run: npm run tauri build
 
       - name: Get version
@@ -78,18 +123,18 @@ jobs:
 
           cd "$B/deb"
           DEB_FILE=$(ls *.deb | head -n 1)
-          mv "$DEB_FILE" "thinkutils_${V}_amd64.deb"
+          mv "$DEB_FILE" "thinkutils_${V}_${{ matrix.deb_arch }}.deb"
 
           cd ../rpm
           RPM_FILE=$(ls *.rpm | head -n 1)
-          mv "$RPM_FILE" "thinkutils-${V}.x86_64.rpm"
+          mv "$RPM_FILE" "thinkutils-${V}.${{ matrix.rpm_arch }}.rpm"
 
           # The AppImage was uploaded under whatever Tauri defaulted to while the
           # deb and rpm carried clean versioned names, so releases shipped one
           # asset named inconsistently with the other two.
           cd ../appimage
           APPIMAGE_FILE=$(ls *.AppImage | head -n 1)
-          mv "$APPIMAGE_FILE" "thinkutils_${V}_amd64.AppImage"
+          mv "$APPIMAGE_FILE" "thinkutils_${V}_${{ matrix.deb_arch }}.AppImage"
 
       # cargo tauri build exiting 0 only proves the metadata parsed. These assert
       # the package CONTAINS what it promises, before it is published.
@@ -97,7 +142,7 @@ jobs:
         run: |
           set -euo pipefail
           V="${{ steps.version.outputs.version }}"
-          deb="src-tauri/target/release/bundle/deb/thinkutils_${V}_amd64.deb"
+          deb="src-tauri/target/release/bundle/deb/thinkutils_${V}_${{ matrix.deb_arch }}.deb"
 
           dpkg-deb --contents "$deb" | grep -q 'usr/bin/thinkutils' \
             || { echo "::error::.deb does not ship /usr/bin/thinkutils"; exit 1; }
@@ -105,10 +150,13 @@ jobs:
           dpkg-deb --contents "$deb" | grep -q 'applications/.*\.desktop' \
             || { echo "::error::.deb ships no .desktop entry - the app would not appear in any launcher"; exit 1; }
 
+          # The binary's real machine type, not the matrix's claim about it. This
+          # is the last point where a cross-compile mishap or a wrong runner is
+          # still catchable before users get the package.
           got=$(file -b src-tauri/target/release/thinkutils)
           case "$got" in
-            *x86-64*) ;;
-            *) echo "::error::built binary is '$got', not x86-64"; exit 1 ;;
+            *"${{ matrix.file_arch }}"*) ;;
+            *) echo "::error::built binary is '$got', expected ${{ matrix.file_arch }}"; exit 1 ;;
           esac
 
           # Tauri's dependency auto-detection is incomplete, so apt resolving the
@@ -117,7 +165,71 @@ jobs:
             echo "::error::binary has unresolved shared libraries"
             exit 1
           fi
-          echo "OK: package ships the binary, a desktop entry, and resolves every library"
+
+          floor=$(objdump -T src-tauri/target/release/thinkutils \
+            | grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sort -uV | tail -1)
+          echo "highest glibc symbol required: ${floor}"
+          case "${floor}" in
+            GLIBC_2.3[6-9]|GLIBC_2.[4-9][0-9]|GLIBC_[3-9]*)
+              echo "::error::binary requires ${floor}, above the Ubuntu 22.04 floor (2.35)"
+              exit 1 ;;
+          esac
+          echo "OK: ${{ matrix.arch }} package ships the binary, a desktop entry, resolves every library, and holds the glibc floor"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-packages-${{ matrix.arch }}
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/bundle/appimage/*.AppImage
+          retention-days: 7
+
+  # One job, after BOTH arches. The APT repository is rebuilt from scratch each
+  # release, so running this per-arch would have the two legs racing to publish
+  # a repo containing only their own packages.
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "version=dev-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-packages-*
+          merge-multiple: true
+          path: staged
+
+      - name: Restore the bundle layout
+        run: |
+          set -euo pipefail
+          for kind in deb rpm appimage; do
+            mkdir -p "src-tauri/target/release/bundle/${kind}"
+          done
+          find staged -name '*.deb'      -exec mv {} src-tauri/target/release/bundle/deb/ ';'
+          find staged -name '*.rpm'      -exec mv {} src-tauri/target/release/bundle/rpm/ ';'
+          find staged -name '*.AppImage' -exec mv {} src-tauri/target/release/bundle/appimage/ ';'
+
+          # Both arches must be present. A missing one would otherwise publish a
+          # release quietly short of half its packages -- and the download page
+          # advertises arm64, so users would follow a link to nothing.
+          for a in amd64 arm64; do
+            ls src-tauri/target/release/bundle/deb/*_${a}.deb >/dev/null 2>&1 \
+              || { echo "::error::no ${a} .deb among the artifacts - refusing to publish a half release"; exit 1; }
+          done
+          find src-tauri/target/release/bundle -type f -print
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')

@@ -3,9 +3,17 @@ pkgname=thinkutils
 pkgver=0.1.10
 pkgrel=1
 pkgdesc="ThinkPad fan control, battery care and system monitoring for Linux"
-# thinkpad_acpi is an x86 platform driver and ThinkPads are x86_64. aarch64 would
-# build but there is no hardware to run it on -- do not claim it.
-arch=('x86_64')
+# Both, and the reasoning is narrower than it looks. thinkpad_acpi IS x86-only,
+# so fan control genuinely cannot work on aarch64 -- but ThinkUtils is not only
+# fan control. Battery charge thresholds go through the generic kernel
+# power_supply API, and the CPU governor and system monitor are not ThinkPad
+# specific at all. Those work on an X13s (Snapdragon 8cx) exactly as they do on
+# an x86 machine.
+#
+# The app already detects an absent /proc/acpi/ibm/fan and reports degraded
+# rather than failing, which is asserted by the container launch tests on both
+# arches -- so this is a supported configuration rather than a hopeful one.
+arch=('x86_64' 'aarch64')
 url="https://github.com/vietanhdev/ThinkUtils"
 license=('LGPL-3.0-or-later')
 depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'librsvg' 'polkit')
