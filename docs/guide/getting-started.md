@@ -27,16 +27,16 @@ Grab a package from the [download page](/download), then:
 
 ::: code-group
 ```bash [Debian/Ubuntu]
-sudo apt install ./thinkutils_*_amd64.deb
+sudo apt install ./thinkutils_*.deb
 ```
 
 ```bash [Fedora/RHEL]
-sudo dnf install ./thinkutils-*.x86_64.rpm
+sudo dnf install ./thinkutils-*.rpm
 ```
 
 ```bash [AppImage]
-chmod +x thinkutils_*_amd64.AppImage
-./thinkutils_*_amd64.AppImage
+chmod +x thinkutils_*.AppImage
+./thinkutils_*.AppImage
 ```
 :::
 
