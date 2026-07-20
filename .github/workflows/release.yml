@@ -144,10 +144,24 @@ jobs:
           V="${{ steps.version.outputs.version }}"
           deb="src-tauri/target/release/bundle/deb/thinkutils_${V}_${{ matrix.deb_arch }}.deb"
 
-          dpkg-deb --contents "$deb" | grep -q 'usr/bin/thinkutils' \
+          # Listed ONCE into a variable, then matched with a herestring.
+          #
+          # `dpkg-deb --contents "$deb" | grep -q ...` is broken under pipefail
+          # and broken in the worst direction: grep -q exits the instant it
+          # matches, dpkg-deb takes SIGPIPE writing the rest of the listing, and
+          # pipefail propagates that non-zero status -- so FINDING the file makes
+          # the check report it missing. It is timing-dependent, which is why it
+          # passed on x86_64 and failed the aarch64 release with
+          # "tar subprocess was killed by signal (Broken pipe)".
+          #
+          # A herestring has no upstream process to kill. Piping into plain
+          # `grep` (no -q) also works, because grep then reads to EOF.
+          contents="$(dpkg-deb --contents "$deb")"
+
+          grep -q 'usr/bin/thinkutils' <<<"$contents" \
             || { echo "::error::.deb does not ship /usr/bin/thinkutils"; exit 1; }
 
-          dpkg-deb --contents "$deb" | grep -q 'applications/.*\.desktop' \
+          grep -q 'applications/.*\.desktop' <<<"$contents" \
             || { echo "::error::.deb ships no .desktop entry - the app would not appear in any launcher"; exit 1; }
 
           # The binary's real machine type, not the matrix's claim about it. This

@@ -29,7 +29,13 @@ jobs:
           # Needed for the pushed-tag check below.
           git config --global --add safe.directory '*'
 
+      # The TAG, not the default branch. Without this the workflow publishes
+      # whatever main happens to contain while labelling it with the requested
+      # version -- so a release cut days ago would ship today's spec, PKGBUILD
+      # and manifests under the old version number.
       - uses: actions/checkout@v7
+        with:
+          ref: v${{ inputs.version }}
 
       # Source0 points at the tag tarball, so a queued build 404s partway through
       # if the tag is not pushed. Cheaper to catch here than in the build log.
@@ -37,7 +43,13 @@ jobs:
         run: |
           set -euo pipefail
           tag="v${{ inputs.version }}"
-          git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null || {
+          # Explicit URL, not the `origin` alias: inside a container the
+          # checkout's git config is not reliably readable, and `git ls-remote
+          # origin` then fails with "'origin' does not appear to be a git
+          # repository" -- which this step reported as "the tag does not exist".
+          # A misleading error about the wrong thing entirely.
+          repo="https://github.com/${{ github.repository }}.git"
+          git ls-remote --exit-code --tags "${repo}" "refs/tags/${tag}" >/dev/null || {
             echo "::error::${tag} does not exist on origin - push it before publishing"
             exit 1
           }
@@ -114,7 +126,12 @@ jobs:
           # `copr-cli list` prints "Name: <project>" plus an indented block, not a
           # bare name, so grepping for the name alone never matches and the script
           # tries to create a project that already exists.
-          if ! copr-cli list 2>/dev/null | grep -qE "^Name:[[:space:]]+thinkutils$"; then
+          # Herestring, not a pipe into grep -q: grep -q exits on first match,
+          # the upstream command takes SIGPIPE, and pipefail turns a successful
+          # match into a failed test. That exact shape broke the aarch64 release
+          # verification, where finding the file reported it as missing.
+          projects="$(copr-cli list 2>/dev/null || true)"
+          if ! grep -qE "^Name:[[:space:]]+thinkutils$" <<<"$projects"; then
             echo ">> creating COPR project thinkutils"
             # Separate argv entries. "${CHROOTS[@]/#/--chroot }" looks equivalent
             # but puts the space INSIDE one argument, so copr-cli sees a single

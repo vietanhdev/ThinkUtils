@@ -366,7 +366,7 @@ read -r -d '' VERDICT <<'VEOF' || true
       # counts. Take the first field and compare in awk, which handles 5.4e+10.
       DIFF="${RAW%% *}"
       echo "pixels changed vs the pre-launch display: ${RAW}"
-      if echo "${DIFF}" | grep -qE "^[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$"; then
+      if grep -qE "^[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$" <<<"${DIFF}"; then
         awk -v d="${DIFF}" "BEGIN{exit !(d>0)}" \
           && echo "OK: ${DIFF} pixels changed after launch" \
           || { echo "FAIL: display is pixel-identical to before launch"; fail=1; }
@@ -413,7 +413,7 @@ read -r -d '' VERDICT <<'VEOF' || true
     else
       # The specific, nameable failure: WebKit rendered index.html's own static
       # text but templateLoader never ran. Every other check above passes here.
-      if echo "${OCRTXT}" | grep -qiE "quick settings and overview"; then
+      if grep -qiE "quick settings and overview" <<<"${OCRTXT}"; then
         echo "FAIL: only index.html's STATIC text is on screen - templateLoader.js"
         echo "      never injected the sidebar or views. WebKit loaded the page;"
         echo "      the JS did not run."
