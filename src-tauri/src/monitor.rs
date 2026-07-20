@@ -81,18 +81,33 @@ pub struct ApiResponse<T> {
     pub error: Option<String>,
 }
 
+/// Collecting stats blocks: it sleeps 200ms between the two `/proc/stat`
+/// samples it has to diff, and shells out to `df` and `ps aux`.
+///
+/// A non-async `#[tauri::command]` runs inline on the IPC thread, so this used
+/// to hard-block the UI. The Monitor view polls every 2s, which meant ≥200ms of
+/// stall out of every 2000ms — a visible ~10% duty cycle of dropped frames in
+/// scrolling, hover, and window dragging for as long as that view was open.
+///
+/// spawn_blocking moves the whole collection onto the blocking pool rather than
+/// just converting the sleep, since the two subprocesses block as well.
 #[tauri::command]
-pub fn get_system_monitor() -> ApiResponse<SystemMonitor> {
-    match collect_system_stats() {
-        Ok(monitor) => ApiResponse {
+pub async fn get_system_monitor() -> ApiResponse<SystemMonitor> {
+    match tokio::task::spawn_blocking(collect_system_stats).await {
+        Ok(Ok(monitor)) => ApiResponse {
             success: true,
             data: Some(monitor),
             error: None,
         },
-        Err(e) => ApiResponse {
+        Ok(Err(e)) => ApiResponse {
             success: false,
             data: None,
             error: Some(e),
+        },
+        Err(e) => ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Monitor collection failed to run: {}", e)),
         },
     }
 }
@@ -126,19 +141,19 @@ fn get_cpu_stats() -> Result<CpuStats, String> {
     // Calculate usage from deltas
     let total_usage = calculate_cpu_usage_from_snapshots(&snapshot1.total, &snapshot2.total);
 
+    // Match the two snapshots by kernel core id rather than by position. A CPU
+    // going offline between the two 200ms-apart reads shifts every later entry,
+    // which would otherwise diff one core's counters against another's and
+    // produce nonsense usage figures.
     let mut cores = Vec::new();
-    for (i, (core1, core2)) in snapshot1
-        .cores
-        .iter()
-        .zip(snapshot2.cores.iter())
-        .enumerate()
-    {
-        let usage = calculate_cpu_usage_from_snapshots(core1, core2);
-        let freq = get_core_frequency(i);
+    for (id, core1) in &snapshot1.cores {
+        let Some((_, core2)) = snapshot2.cores.iter().find(|(id2, _)| id2 == id) else {
+            continue;
+        };
         cores.push(CoreStats {
-            core_id: i,
-            usage_percent: usage,
-            frequency: freq,
+            core_id: *id,
+            usage_percent: calculate_cpu_usage_from_snapshots(core1, core2),
+            frequency: get_core_frequency(*id),
         });
     }
 
@@ -154,7 +169,9 @@ fn get_cpu_stats() -> Result<CpuStats, String> {
 #[derive(Debug)]
 struct CpuSnapshot {
     total: CpuTimes,
-    cores: Vec<CpuTimes>,
+    /// `(kernel core id, times)`. The id is carried rather than implied by
+    /// position because /proc/stat skips offline CPUs.
+    cores: Vec<(usize, CpuTimes)>,
 }
 
 #[derive(Debug)]
@@ -177,15 +194,20 @@ fn parse_cpu_snapshot(stat: &str) -> Result<CpuSnapshot, String> {
         if line.starts_with("cpu ") {
             total = Some(parse_cpu_line(line)?);
         } else if line.starts_with("cpu") && line.len() > 3 {
-            if let Some(core_id) = line.strip_prefix("cpu") {
-                if core_id
+            if let Some(rest) = line.strip_prefix("cpu") {
+                // Keep the id the kernel reported. It used to be parsed only to
+                // check it was numeric and then discarded, with the caller's
+                // Vec index standing in for it. /proc/stat omits offline CPUs
+                // entirely, so on a machine with cpu5 offline every core after
+                // the gap was labelled one too low and its frequency was read
+                // from the wrong (offline) CPU, showing 0 MHz.
+                if let Ok(id) = rest
                     .split_whitespace()
                     .next()
                     .unwrap_or("")
                     .parse::<usize>()
-                    .is_ok()
                 {
-                    cores.push(parse_cpu_line(line)?);
+                    cores.push((id, parse_cpu_line(line)?));
                 }
             }
         }
@@ -438,4 +460,62 @@ fn get_total_memory_mb() -> f64 {
                 })
         })
         .unwrap_or(8192.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A realistic /proc/stat with cpu5 offline. The kernel omits offline CPUs
+    /// entirely rather than reporting them as idle, so the numbering has a hole.
+    const STAT_WITH_CPU5_OFFLINE: &str = "\
+cpu  100 0 50 900 0 0 0 0
+cpu0 10 0 5 90 0 0 0 0
+cpu1 10 0 5 90 0 0 0 0
+cpu2 10 0 5 90 0 0 0 0
+cpu3 10 0 5 90 0 0 0 0
+cpu4 10 0 5 90 0 0 0 0
+cpu6 10 0 5 90 0 0 0 0
+cpu7 10 0 5 90 0 0 0 0
+intr 12345
+ctxt 67890
+";
+
+    /// The regression: core ids came from the Vec index, so everything after the
+    /// gap was labelled one too low — cpu6 reported as core 5, cpu7 as core 6 —
+    /// and each read its frequency from the wrong CPU. Index 5 pointed at the
+    /// offline cpu5, which has no cpufreq directory, so it showed 0 MHz.
+    #[test]
+    fn offline_cpus_do_not_shift_core_ids() {
+        let snap = parse_cpu_snapshot(STAT_WITH_CPU5_OFFLINE).expect("parses");
+
+        let ids: Vec<usize> = snap.cores.iter().map(|(id, _)| *id).collect();
+        assert_eq!(
+            ids,
+            vec![0, 1, 2, 3, 4, 6, 7],
+            "ids must be the kernel's, not positions in the vector"
+        );
+        assert!(
+            !ids.contains(&5),
+            "cpu5 is offline and absent from /proc/stat"
+        );
+    }
+
+    /// The `cpu ` aggregate line must not be counted as a core, or the machine
+    /// reports one more core than it has.
+    #[test]
+    fn the_aggregate_line_is_not_a_core() {
+        let snap = parse_cpu_snapshot(STAT_WITH_CPU5_OFFLINE).expect("parses");
+        assert_eq!(snap.cores.len(), 7, "seven online CPUs, not eight");
+        assert_eq!(snap.total.user, 100, "aggregate parsed into total");
+    }
+
+    /// Non-cpu lines sit between and after the cpu lines in a real /proc/stat.
+    #[test]
+    fn unrelated_lines_are_ignored() {
+        let snap = parse_cpu_snapshot(STAT_WITH_CPU5_OFFLINE).expect("parses");
+        for (id, _) in &snap.cores {
+            assert!(*id < 8, "parsed a bogus core id {}", id);
+        }
+    }
 }
