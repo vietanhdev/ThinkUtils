@@ -34,7 +34,13 @@ pub struct PermissionStatus {
 // meant the wrong path was silently skipped rather than reported.
 const REQUIRED_FILES: &[&str] = &[
     "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor",
+    // Turbo lives at a different path per vendor: intel_pstate exposes no_turbo,
+    // everything else (amd_pstate, acpi-cpufreq) exposes cpufreq/boost. Only the
+    // Intel one was listed, so on an AMD ThinkPad "Grant Permissions" reported
+    // success while leaving the boost control unwritable. Both are listed and
+    // non-existent paths are skipped, so each machine gets whichever it has.
     "/sys/devices/system/cpu/intel_pstate/no_turbo",
+    "/sys/devices/system/cpu/cpufreq/boost",
 ];
 
 /// Every sysfs file the app wants writable, resolved for this machine.

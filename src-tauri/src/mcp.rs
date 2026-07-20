@@ -181,10 +181,23 @@ impl ThinkUtilsHandler {
                 .map(|s| s.trim().to_string())
                 .unwrap_or("N/A".into())
         };
+        // Resolve the threshold files the same way the setter does. Naming them
+        // directly meant this reader picked one spelling while the machine might
+        // only expose the other, reporting N/A for thresholds that work fine.
+        let read_path = |p: &str| {
+            fs::read_to_string(p)
+                .map(|s| s.trim().to_string())
+                .unwrap_or("N/A".into())
+        };
+        let (start, stop) = match crate::battery::threshold_paths() {
+            Some((s, e)) => (read_path(&s), read_path(&e)),
+            None => ("N/A".into(), "N/A".into()),
+        };
+
         format!(
             "Status: {}\nCapacity: {}%\nCycle Count: {}\nTechnology: {}\nStart Threshold: {}%\nStop Threshold: {}%",
             r("status"), r("capacity"), r("cycle_count"), r("technology"),
-            r("charge_control_start_threshold"), r("charge_control_end_threshold"),
+            start, stop,
         )
     }
 
