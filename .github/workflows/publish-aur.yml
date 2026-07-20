@@ -130,16 +130,38 @@ jobs:
           cp /tmp/aur/PKGBUILD /tmp/aur/.SRCINFO /tmp/aur-repo/
           cd /tmp/aur-repo
 
-          if git diff --quiet; then
+          # Stage FIRST, then ask whether anything is staged.
+          #
+          # `git diff --quiet` before staging compares tracked files only, so on
+          # a brand-new AUR package -- an empty repo, where PKGBUILD and .SRCINFO
+          # are untracked -- it sees no change, prints "No change to publish" and
+          # exits 0. The workflow then reports success having pushed nothing,
+          # which is precisely what happened on the first v0.2.0 publish: green
+          # run, 404 package.
+          #
+          # git status --porcelain counts untracked and staged entries, and works
+          # in a repo with no HEAD to diff against.
+          git add PKGBUILD .SRCINFO
+          if [ -z "$(git status --porcelain)" ]; then
             echo "No change to publish."
             exit 0
           fi
 
-          git add PKGBUILD .SRCINFO
           git commit -m "Update to ${{ inputs.version }}"
           # AUR's default branch is master; a local `main` needs the explicit
           # refspec or the push is silently accepted into the wrong ref.
           git push origin HEAD:master
+
+          # Confirm the remote actually moved. A push that resolves to a no-op
+          # exits 0, and this workflow has already reported success once while
+          # publishing nothing.
+          local_sha="$(git rev-parse HEAD)"
+          remote_sha="$(git ls-remote origin refs/heads/master | cut -f1)"
+          if [ "${local_sha}" != "${remote_sha}" ]; then
+            echo "::error::push did not land - local ${local_sha} but remote master is ${remote_sha:-<empty>}"
+            exit 1
+          fi
+          echo "published ${local_sha} to AUR master"
 
       - name: Dry run notice
         if: ${{ inputs.dry_run }}
