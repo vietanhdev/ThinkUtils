@@ -137,15 +137,39 @@ async function initializeApp() {
   }
 
   initializeElements();
-  setupTitlebar();
-  setupFeatureNavigation();
-  setupFanControl();
-  setupHomeActions();
-  setupSyncHandlers();
-  setupBatteryHandlers();
-  setupSecurityHandlers();
-  setupAboutDialog();
-  setupPermissionDialog();
+
+  // Each view's setup wires listeners onto cached elements, and every one of
+  // them dereferences those elements without checking. If a single template
+  // failed to load, the first such access threw and took the whole boot
+  // sequence with it -- every later setup call, the permission check, and
+  // settings loading never ran, while the sidebar (wired one line earlier)
+  // still switched views. The app looked alive with every control inert, and
+  // the template-failure handler above claimed to "continue anyway" while
+  // doing nothing of the sort.
+  //
+  // Isolating each step makes that claim true: a broken view costs that view,
+  // not the application. Failures are reported rather than swallowed, so this
+  // degrades loudly instead of silently.
+  const failures = [];
+  const step = (name, fn) => {
+    try {
+      fn();
+    } catch (error) {
+      console.error(`[ThinkUtils] ${name} failed:`, error);
+      failures.push(`${name}: ${error?.message ?? error}`);
+      reportError(`init step ${name} failed: ${error?.message ?? error}`);
+    }
+  };
+
+  step('titlebar', setupTitlebar);
+  step('navigation', setupFeatureNavigation);
+  step('fan', setupFanControl);
+  step('home', setupHomeActions);
+  step('sync', setupSyncHandlers);
+  step('battery', setupBatteryHandlers);
+  step('security', setupSecurityHandlers);
+  step('about', setupAboutDialog);
+  step('permissionDialog', setupPermissionDialog);
 
   // The fan sensor poll is NOT started here any more. It runs every second, and
   // starting it at launch meant it polled /proc for the life of the app no
@@ -170,6 +194,14 @@ async function initializeApp() {
   }, 2000);
   setState('homeInterval', homeInterval);
 
+  // Paint the starting view now rather than waiting for the first interval
+  // tick. switchView() is only reached from a sidebar click, so the view the
+  // app opens on never got its refresh and Home showed template placeholders
+  // for its first two seconds.
+  if (state.currentView === 'home') {
+    step('initial home refresh', updateHomeView);
+  }
+
   console.log('[ThinkUtils] Ready');
 
   // Signal that init actually completed. A headless test can see a fully painted
@@ -178,7 +210,11 @@ async function initializeApp() {
   try {
     await window.__TAURI__?.core?.invoke('report_frontend_ready', {
       templates: loadedTemplateCount,
-      views: document.querySelectorAll('#views-container > *').length
+      views: document.querySelectorAll('#views-container > *').length,
+      // Reaching this line no longer proves every view wired up, since a failed
+      // step is now isolated rather than fatal. Report which ones failed so a
+      // half-working boot is still visible to the launch test.
+      failed: failures
     });
   } catch (error) {
     console.error('[ThinkUtils] Could not report ready state:', error);

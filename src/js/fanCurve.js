@@ -267,10 +267,32 @@ function yToLevel(y) {
   return LEVEL_MAX - ((y - CANVAS_PADDING) / (height - 2 * CANVAS_PADDING)) * range;
 }
 
-function handleMouseDown(e) {
+// Pointer position in canvas coordinates.
+//
+// getBoundingClientRect() reports CSS pixels, but tempToX/levelToY are built
+// from canvas.width/height -- the backing store, fixed at 600x400 by the
+// element's attributes. The canvas is styled `max-width: 100%; height: auto`,
+// so the moment its rendered width drops below 600 the two spaces diverge and
+// every hit test is computed against the wrong point.
+//
+// That is not a corner case: the window's own minWidth is 700px, and the nav
+// rail plus the status sidebar take ~470px of it, so at minimum size the canvas
+// renders at roughly half its backing width. Points became ungrabbable, and a
+// click near one latched onto a different point and flung it to the wrong
+// temperature.
+function canvasPoint(e) {
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+  // Guard against a zero-sized rect (display:none) producing Infinity.
+  const scaleX = rect.width ? canvas.width / rect.width : 1;
+  const scaleY = rect.height ? canvas.height / rect.height : 1;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY
+  };
+}
+
+function handleMouseDown(e) {
+  const { x, y } = canvasPoint(e);
 
   // Check if clicking on a point
   for (let i = 0; i < curvePoints.length; i++) {
@@ -288,9 +310,7 @@ function handleMouseDown(e) {
 }
 
 function handleMouseMove(e) {
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+  const { x, y } = canvasPoint(e);
 
   if (isDragging && draggedPointIndex >= 0) {
     // Update point position
