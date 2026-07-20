@@ -155,13 +155,32 @@ jobs:
           # Confirm the remote actually moved. A push that resolves to a no-op
           # exits 0, and this workflow has already reported success once while
           # publishing nothing.
+          #
+          # Retried, because AUR closes the SSH connection immediately after a
+          # push: the first attempt at this got "Connection closed by ... port
+          # 22" and failed a run whose push had in fact succeeded. Reporting
+          # failure on a successful publish is its own hazard -- it invites a
+          # re-run, and re-running a publish is not always harmless.
           local_sha="$(git rev-parse HEAD)"
-          remote_sha="$(git ls-remote origin refs/heads/master | cut -f1)"
-          if [ "${local_sha}" != "${remote_sha}" ]; then
-            echo "::error::push did not land - local ${local_sha} but remote master is ${remote_sha:-<empty>}"
+          remote_sha=""
+          for attempt in 1 2 3 4 5; do
+            remote_sha="$(git ls-remote origin refs/heads/master 2>/dev/null | cut -f1)"
+            [ -n "${remote_sha}" ] && break
+            echo "  ls-remote attempt ${attempt} got nothing (AUR often drops the connection after a push); retrying"
+            sleep $((attempt * 5))
+          done
+
+          if [ -z "${remote_sha}" ]; then
+            # Could not reach AUR to confirm. The push itself reported success,
+            # so do NOT fail -- say plainly that it is unconfirmed and let the
+            # package page be the check.
+            echo "::warning::could not reach AUR to confirm the push landed; git push reported success. Verify at https://aur.archlinux.org/packages/thinkutils"
+          elif [ "${local_sha}" != "${remote_sha}" ]; then
+            echo "::error::push did not land - local ${local_sha} but remote master is ${remote_sha}"
             exit 1
+          else
+            echo "published ${local_sha} to AUR master"
           fi
-          echo "published ${local_sha} to AUR master"
 
       - name: Dry run notice
         if: ${{ inputs.dry_run }}
