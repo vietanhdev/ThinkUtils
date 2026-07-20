@@ -99,35 +99,19 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo install cargo-audit --locked
 
-      # Two advisory clusters are ignored, each with its reasoning and a tracking
-      # issue. They are ignored rather than tolerated as a red check because a job
-      # that is permanently failing teaches everyone to stop reading it -- at which
-      # point the NEXT advisory, the one that does matter, goes unnoticed too.
+      # Run with no exemptions at all. rmcp 2 cleared RUSTSEC-2026-0189 and the
+      # oauth2 5 / reqwest 0.12 upgrade cleared the rustls-webpki cluster, so
+      # every actionable advisory is genuinely fixed rather than suppressed.
+      # Only the unmaintained gtk-rs warnings remain, which cargo audit reports
+      # without failing on.
       #
-      # Re-litigate both when the upgrades land. Neither is a permanent exemption.
+      # Keep it exemption-free. A bare invocation is self-enforcing: adding an
+      # --ignore is a visible diff to this file, and a job that is permanently
+      # red is a job everyone stops reading -- at which point the NEXT advisory,
+      # the one that matters, goes unnoticed too.
       - name: cargo audit
         working-directory: src-tauri
-        run: |
-          # No exemptions. rmcp 2 cleared RUSTSEC-2026-0189 and the
-          # oauth2 5 / reqwest 0.12 upgrade cleared the rustls-webpki cluster,
-          # so every actionable advisory is genuinely fixed rather than ignored.
-          # Only the unmaintained gtk-rs warnings remain, and cargo audit does
-          # not fail on those.
-          cargo audit
-
-      # Kept deliberately: the list is empty now, and it should stay that way
-      # unless someone writes down why. An --ignore added without a reason beside
-      # it is how a permanently-red job becomes a permanently-unread one.
-      - name: No undocumented advisory exemptions
-        run: |
-          set -euo pipefail
-          undocumented=$(grep -c -- '--ignore RUSTSEC' .github/workflows/ci.yml || true)
-          if [ "${undocumented:-0}" -ne 0 ]; then
-            echo "::error::an advisory is ignored; add the reasoning and the upgrade that clears it"
-            grep -n -- '--ignore RUSTSEC' .github/workflows/ci.yml
-            exit 1
-          fi
-          echo "OK: no advisories are being ignored"
+        run: cargo audit
 
   # ThinkUtils tells users which packages to install and which commands to run.
   # Getting the distro wrong hands someone a command that cannot work.
