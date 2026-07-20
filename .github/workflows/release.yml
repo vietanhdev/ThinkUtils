@@ -135,14 +135,21 @@ jobs:
 
       - name: Update APT repository
         if: startsWith(github.ref, 'refs/tags/')
+        env:
+          # Unset until a signing key exists, in which case the step publishes
+          # unsigned and says so loudly rather than failing the release.
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
         run: |
           # This step publishes to a live APT repo that users have in their
           # sources.list. A half-finished run takes that repo down, so it fails
           # fast rather than pressing on.
           set -euo pipefail
 
-          # Install dpkg-scanpackages
-          sudo apt-get install -y dpkg-dev
+          # dpkg-dev provides dpkg-scanpackages; apt-utils provides
+          # apt-ftparchive. The runner image happens to preinstall apt-utils, so
+          # omitting it worked by luck rather than by declaration.
+          sudo apt-get install -y dpkg-dev apt-utils
 
           # Verify the .deb exists BEFORE touching the published repo. The old
           # order deleted the existing package first and copied second, so a glob
@@ -193,14 +200,88 @@ jobs:
           # Generate Release file
           apt-ftparchive release . > Release
 
-          # Create index page
-          cat > ../index.html << 'HTMLEOF'
+          # Sign it.
+          #
+          # An unsigned repository is why the install instructions needed
+          # [trusted=yes], a flag that tells apt to skip verification entirely.
+          # That matters more here than for most repos: this package ships a
+          # root-invoked fan helper and a polkit rule, and dpkg maintainer
+          # scripts run as root. HTTPS authenticates the host for the duration
+          # of the transfer; it says nothing about whether the bytes sitting on
+          # the branch, or in any cache in front of it, are the ones we built.
+          if [ -n "${APT_GPG_PRIVATE_KEY:-}" ]; then
+            GNUPGHOME="$(mktemp -d)"
+            export GNUPGHOME
+            chmod 700 "$GNUPGHOME"
+
+            printf '%s' "$APT_GPG_PRIVATE_KEY" | gpg --batch --quiet --import
+            key_id=$(gpg --batch --list-secret-keys --with-colons \
+                     | awk -F: '/^sec:/ {print $5; exit}')
+            if [ -z "$key_id" ]; then
+              echo "::error::APT_GPG_PRIVATE_KEY is set but contains no secret key"
+              exit 1
+            fi
+
+            # InRelease (inline signature) is what modern apt prefers;
+            # Release.gpg is the detached form older clients still look for.
+            gpg --batch --yes --pinentry-mode loopback \
+                --passphrase "${APT_GPG_PASSPHRASE:-}" --local-user "$key_id" \
+                --clearsign -o InRelease Release
+            gpg --batch --yes --pinentry-mode loopback \
+                --passphrase "${APT_GPG_PASSPHRASE:-}" --local-user "$key_id" \
+                -abs -o Release.gpg Release
+
+            # Publish the public half so users can pin it with signed-by=.
+            gpg --batch --armor --export "$key_id" > thinkutils-archive-keyring.asc
+
+            # Fail loudly rather than publishing a signature that does not
+            # verify -- apt treats a bad signature as harder breakage than none.
+            gpg --batch --verify Release.gpg Release
+            echo "signed the Release file with ${key_id}"
+
+            rm -rf "$GNUPGHOME"
+            unset GNUPGHOME
+            SIGNED=1
+          else
+            # Critical: a previous run may have published a signature. Leaving a
+            # stale InRelease next to a regenerated Release breaks apt outright
+            # for everyone, which is strictly worse than being unsigned.
+            rm -f InRelease Release.gpg thinkutils-archive-keyring.asc
+            SIGNED=0
+            echo "::warning::APT_GPG_PRIVATE_KEY is not configured. Publishing an \
+          UNSIGNED repository; users must keep [trusted=yes], which disables \
+          verification. See docs/development/apt-signing.md to set this up."
+          fi
+
+          # Create index page, matching whichever form was actually published.
+          if [ "$SIGNED" = "1" ]; then
+            sources_line='deb [signed-by=/usr/share/keyrings/thinkutils-archive-keyring.gpg] https://gh.vietanh.dev/ThinkUtils/apt ./'
+            cat > ../index.html << HTMLEOF
           <!DOCTYPE html>
           <html>
           <head><title>ThinkUtils APT Repository</title></head>
           <body>
           <h1>ThinkUtils APT Repository</h1>
           <p>Add this repository to install ThinkUtils via apt:</p>
+          <pre>
+          curl -fsSL https://gh.vietanh.dev/ThinkUtils/apt/thinkutils-archive-keyring.asc \\
+            | sudo gpg --dearmor -o /usr/share/keyrings/thinkutils-archive-keyring.gpg
+          echo "${sources_line}" | sudo tee /etc/apt/sources.list.d/thinkutils.list
+          sudo apt update
+          sudo apt install thinkutils
+          </pre>
+          </body>
+          </html>
+          HTMLEOF
+          else
+            cat > ../index.html << 'HTMLEOF'
+          <!DOCTYPE html>
+          <html>
+          <head><title>ThinkUtils APT Repository</title></head>
+          <body>
+          <h1>ThinkUtils APT Repository</h1>
+          <p><strong>This repository is not signed.</strong> The command below uses
+          <code>[trusted=yes]</code>, which disables apt's signature checking.</p>
           <pre>
           echo "deb [trusted=yes] https://gh.vietanh.dev/ThinkUtils/apt ./" | sudo tee /etc/apt/sources.list.d/thinkutils.list
           sudo apt update
@@ -209,6 +290,7 @@ jobs:
           </body>
           </html>
           HTMLEOF
+          fi
 
           # Commit and push
           cd ..
