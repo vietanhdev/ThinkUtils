@@ -121,20 +121,43 @@ sudo apt install thinkutils
 ```
 
 ::: warning What `[trusted=yes]` means
-This repository is not yet GPG-signed, and `[trusted=yes]` tells `apt` to install
-from it without verifying any signature. HTTPS still authenticates the server for
-the duration of the download, but nothing proves the packages are the ones our CI
-built — and ThinkUtils installs a helper that runs as root.
+`[trusted=yes]` tells `apt` to install without verifying any signature. HTTPS
+still authenticates the server for the duration of the download, but nothing
+proves the packages are the ones our CI built — and ThinkUtils installs a helper
+that runs as root.
 
-If that trade-off is not one you want to make, download the `.deb` from the
-[releases page](https://github.com/vietanhdev/ThinkUtils/releases) and install it
-with `apt install ./thinkutils_*.deb` instead. You give up automatic updates and
-check for new versions yourself.
+It is needed because the **currently published** repository is unsigned. A
+signing key is now configured, so the next release will publish a signed
+repository and these instructions change to the ones below.
 
-Signing is implemented and waiting on a key — see
-[apt-signing](/development/apt-signing). Once it is enabled these instructions
-change to `signed-by=` and the `[trusted=yes]` flag goes away.
+If you would rather not take that trade in the meantime, download the `.deb`
+from the [releases page](https://github.com/vietanhdev/ThinkUtils/releases) and
+install it with `apt install ./thinkutils_*.deb`. You give up automatic updates
+and check for new versions yourself.
 :::
+
+### From the next release: verified installs
+
+Once a signed release is published, `https://gh.vietanh.dev/ThinkUtils/apt` will
+carry `InRelease`, `Release.gpg`, and the public key. Switch to:
+
+```bash
+curl -fsSL https://gh.vietanh.dev/ThinkUtils/apt/thinkutils-archive-keyring.asc \
+  | sudo gpg --dearmor -o /usr/share/keyrings/thinkutils-archive-keyring.gpg
+
+echo "deb [signed-by=/usr/share/keyrings/thinkutils-archive-keyring.gpg] https://gh.vietanh.dev/ThinkUtils/apt ./" \
+  | sudo tee /etc/apt/sources.list.d/thinkutils.list
+
+sudo apt update
+sudo apt install thinkutils
+```
+
+`signed-by=` scopes the key to this one repository, so it cannot vouch for
+packages from anywhere else in your sources. The repository's own index page
+always shows whichever form is currently published — it is generated from what
+the release actually produced, so it cannot disagree with reality.
+
+Maintainers: see [apt-signing](/development/apt-signing).
 
 ## Before fan control works
 
