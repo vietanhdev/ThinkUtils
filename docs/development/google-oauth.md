@@ -26,27 +26,40 @@ In your OAuth client settings, add:
 http://localhost:8765/callback
 ```
 
-### 4. Configure the App
+### 4. Build with the client ID
 
-Replace the placeholder values in `src-tauri/src/sync.rs`:
-
-```rust
-const GOOGLE_CLIENT_ID: &str = "YOUR_CLIENT_ID.apps.googleusercontent.com";
-const GOOGLE_CLIENT_SECRET: &str = "YOUR_CLIENT_SECRET";
-```
-
-### 5. Rebuild
+The ID is supplied at build time, not committed:
 
 ```bash
-npm run tauri build
+THINKUTILS_GOOGLE_CLIENT_ID="YOUR_CLIENT_ID.apps.googleusercontent.com" \
+  npm run tauri build
 ```
+
+::: warning There is no client secret, deliberately
+A desktop binary cannot keep a secret. Anything compiled in is readable by
+anyone holding the binary — which is exactly how this project's first client
+secret ended up public, in the initial commit.
+
+ThinkUtils is a **public client using PKCE**, which is Google's own guidance for
+installed apps. PKCE is what protects the exchange: the verifier is generated per
+authorisation, never leaves the process, and an intercepted authorisation code is
+useless without it. A shipped secret would add nothing an attacker cannot read,
+while creating something that has to be rotated when it leaks.
+
+If Google's console offers you a secret for a **Desktop app** client, you can
+ignore it. Do not add it to the build.
+:::
+
+A test asserts `set_client_secret` never appears in `sync.rs`, so re-adding one
+to work around an auth error fails CI rather than shipping.
 
 ## How It Works
 
 1. User clicks Login — opens Google OAuth in browser
 2. User authorizes ThinkUtils for Google Drive access
 3. OAuth redirects to `localhost:8765/callback`
-4. App exchanges auth code for access token
+4. App exchanges the auth code for a token, proving possession of the PKCE
+   verifier it generated in step 1
 5. Settings sync as `thinkutils_settings.json` in Google Drive root
 
 ## Security
