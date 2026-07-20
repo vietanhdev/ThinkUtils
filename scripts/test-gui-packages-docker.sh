@@ -237,6 +237,15 @@ read -r -d '' VERDICT <<'VEOF' || true
   else
     echo "FAIL: frontend never signalled ready - JS init did not complete"; fail=1
   fi
+  # Reaching "ready" no longer means every view wired up: each setup step is
+  # isolated so one failure cannot abort the boot. That is the right behaviour
+  # for users and a blind spot for this test, since a partially wired app paints
+  # exactly like a working one.
+  if grep -q "\[thinkutils\] frontend init had" /tmp/app.log; then
+    echo "FAIL: frontend booted with failing setup step(s):"
+    grep "frontend init had" /tmp/app.log | head -5 | sed "s/^/    /"
+    fail=1
+  fi
   # The check that catches a view dying on a missing sysfs path while the sidebar
   # still paints and the process still lives.
   if grep -q "\[thinkutils\] frontend error:" /tmp/app.log; then

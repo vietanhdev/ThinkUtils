@@ -117,10 +117,54 @@ fn read_battery_info(path: &str, index: usize) -> Result<BatteryInfo, String> {
     })
 }
 
+/// Attribute names for the charge thresholds, most-standard first.
+///
+/// `charge_control_*` is the generic kernel power-supply API and works beyond
+/// ThinkPads. `charge_*_threshold` is the older thinkpad_acpi-specific spelling.
+///
+/// On a ThinkPad BOTH exist and report the same value, but they are separate
+/// sysfs files — so a chmod on one does not affect the other. That is exactly
+/// how this broke: permissions.rs granted access to the legacy pair while
+/// battery.rs wrote the standard pair, so "Grant Permissions" never made battery
+/// thresholds writable and every change fell through to a password prompt.
+const THRESHOLD_ATTRS: &[(&str, &str)] = &[
+    (
+        "charge_control_start_threshold",
+        "charge_control_end_threshold",
+    ),
+    ("charge_start_threshold", "charge_stop_threshold"),
+];
+
+/// The threshold file pair this machine actually exposes.
+///
+/// Returns the first pair where both files exist. Every caller must go through
+/// here — the duplication between modules is what allowed them to disagree.
+pub fn threshold_paths() -> Option<(String, String)> {
+    THRESHOLD_ATTRS.iter().find_map(|(start, stop)| {
+        let start_path = format!("{}/{}", BAT0_PATH, start);
+        let stop_path = format!("{}/{}", BAT0_PATH, stop);
+        (Path::new(&start_path).exists() && Path::new(&stop_path).exists())
+            .then_some((start_path, stop_path))
+    })
+}
+
 #[tauri::command]
 pub fn get_battery_thresholds() -> ApiResponse<BatteryThresholds> {
-    let start_path = format!("{}/charge_control_start_threshold", BAT0_PATH);
-    let stop_path = format!("{}/charge_control_end_threshold", BAT0_PATH);
+    let (start_path, stop_path) = match threshold_paths() {
+        Some(pair) => pair,
+        None => {
+            // Preserve the previous defaults so callers that ignore `success`
+            // keep behaving as before.
+            return ApiResponse {
+                success: true,
+                data: Some(BatteryThresholds {
+                    start: 0,
+                    stop: 100,
+                }),
+                error: None,
+            };
+        }
+    };
 
     let start = fs::read_to_string(&start_path)
         .ok()
@@ -171,8 +215,18 @@ pub async fn set_battery_thresholds(start: u8, stop: u8) -> ApiResponse<String> 
         };
     }
 
-    let start_path = format!("{}/charge_control_start_threshold", BAT0_PATH);
-    let stop_path = format!("{}/charge_control_end_threshold", BAT0_PATH);
+    let (start_path, stop_path) = match threshold_paths() {
+        Some(pair) => pair,
+        None => {
+            return ApiResponse {
+                success: false,
+                data: None,
+                error: Some(
+                    "This machine exposes no battery charge threshold controls.".to_string(),
+                ),
+            }
+        }
+    };
 
     // get_battery_thresholds() has no failure path — it substitutes defaults on a
     // failed read — so there is nothing to match on. Note the substituted default
@@ -203,36 +257,13 @@ pub async fn set_battery_thresholds(start: u8, stop: u8) -> ApiResponse<String> 
     }
 
     // Need elevated permissions. Writes stay in the order chosen above.
-    let temp_script = format!("/tmp/battery_thresholds_{}.sh", std::process::id());
     let script_content = format!(
         "#!/bin/bash\nset -e\necho {} > {}\necho {} > {}\nexit 0\n",
         first_value, first_path, second_value, second_path
     );
 
-    if let Err(e) = fs::write(&temp_script, script_content) {
-        return ApiResponse {
-            success: false,
-            data: None,
-            error: Some(format!("Failed to create script: {}", e)),
-        };
-    }
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::Permissions::from_mode(0o755);
-        let _ = fs::set_permissions(&temp_script, perms);
-    }
-
-    match tokio::process::Command::new("pkexec")
-        .arg("bash")
-        .arg(&temp_script)
-        .output()
-        .await
-    {
+    match crate::privileged::run_script(&script_content).await {
         Ok(output) => {
-            let _ = fs::remove_file(&temp_script);
-
             if output.status.success() {
                 ApiResponse {
                     success: true,
@@ -247,14 +278,11 @@ pub async fn set_battery_thresholds(start: u8, stop: u8) -> ApiResponse<String> 
                 }
             }
         }
-        Err(e) => {
-            let _ = fs::remove_file(&temp_script);
-            ApiResponse {
-                success: false,
-                data: None,
-                error: Some(format!("Failed to execute: {}", e)),
-            }
-        }
+        Err(e) => ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Failed to execute: {}", e)),
+        },
     }
 }
 
@@ -349,5 +377,50 @@ mod tests {
     #[test]
     fn unreadable_current_start_falls_back_to_stop_first() {
         assert!(!write_start_first(0, 80));
+    }
+}
+
+#[cfg(test)]
+mod threshold_path_tests {
+    use super::*;
+
+    /// The generic kernel API must be preferred. Both spellings exist on a
+    /// ThinkPad and report the same value, but only the generic one exists on
+    /// other hardware, so choosing the legacy pair first would silently limit
+    /// support to ThinkPads.
+    #[test]
+    fn prefers_the_generic_kernel_attribute_names() {
+        assert_eq!(
+            THRESHOLD_ATTRS[0],
+            (
+                "charge_control_start_threshold",
+                "charge_control_end_threshold"
+            )
+        );
+    }
+
+    /// The legacy thinkpad_acpi spelling stays as a fallback for older kernels
+    /// that expose only it.
+    #[test]
+    fn keeps_the_legacy_spelling_as_a_fallback() {
+        assert!(THRESHOLD_ATTRS
+            .iter()
+            .any(|(s, e)| *s == "charge_start_threshold" && *e == "charge_stop_threshold"));
+    }
+
+    /// Start and stop must never come from different naming schemes: writing a
+    /// generic start and a legacy stop would touch two different sysfs files and
+    /// could leave the pair inconsistent.
+    #[test]
+    fn each_candidate_pair_uses_one_naming_scheme() {
+        for (start, stop) in THRESHOLD_ATTRS {
+            let start_is_generic = start.starts_with("charge_control_");
+            let stop_is_generic = stop.starts_with("charge_control_");
+            assert_eq!(
+                start_is_generic, stop_is_generic,
+                "mixed naming scheme in pair ({}, {})",
+                start, stop
+            );
+        }
     }
 }

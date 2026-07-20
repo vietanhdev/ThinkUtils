@@ -21,6 +21,12 @@ export function showStatus(message, type = 'info') {
     document.body.appendChild(statusEl);
   }
 
+  // Without a live region this banner is invisible to screen readers, so every
+  // success and failure message went unannounced. Errors are assertive because
+  // the action failed and the user needs to know now; the rest are polite.
+  statusEl.setAttribute('role', 'status');
+  statusEl.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+
   statusEl.textContent = message;
 
   const colors = {
@@ -42,4 +48,22 @@ export function showStatus(message, type = 'info') {
       statusEl.style.display = 'none';
     }
   }, timeout);
+}
+
+/**
+ * Escape text for safe interpolation into innerHTML.
+ *
+ * Several views render strings that originate outside the app — process names
+ * from `ps aux`, mount points, network interface names, ClamAV threat names.
+ * Any local user can create a process named `<img src=x onerror=...>`, and with
+ * `withGlobalTauri` enabled that script would reach the full `__TAURI__` API.
+ *
+ * Lives here rather than in one view because it was previously private to
+ * security.js, so every other view rendering untrusted strings had no escaping
+ * at all.
+ */
+export function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text ?? '';
+  return div.innerHTML;
 }

@@ -2,7 +2,7 @@
 const { invoke } = window.__TAURI__.core;
 import { elements } from '../dom.js';
 import { setState, getState } from '../state.js';
-import { showStatus } from '../utils.js';
+import { showStatus, escapeHtml } from '../utils.js';
 import { initFanCurve, startCurveMode, stopCurveMode } from '../fanCurve.js';
 
 export function setupFanControl() {
@@ -68,8 +68,8 @@ function updateTemperatureDisplay(temps) {
       const row = document.createElement('div');
       row.className = 'metric-row';
       row.innerHTML = `
-      <span class="metric-label">${label}</span>
-      <span class="metric-value">${value}</span>
+      <span class="metric-label">${escapeHtml(label)}</span>
+      <span class="metric-value">${escapeHtml(value)}</span>
     `;
       elements.tempMetrics.appendChild(row);
     });
@@ -108,8 +108,8 @@ function updateFanDisplay(fans) {
       const row = document.createElement('div');
       row.className = label === 'Fan1' ? 'metric-row highlight' : 'metric-row';
       row.innerHTML = `
-        <span class="metric-label">${label}</span>
-        <span class="metric-value">${value}</span>
+        <span class="metric-label">${escapeHtml(label)}</span>
+        <span class="metric-value">${escapeHtml(value)}</span>
       `;
       elements.fanMetrics.appendChild(row);
     });
@@ -312,7 +312,18 @@ async function tryUpdatePermissions() {
 }
 
 export function startAutoUpdate() {
+  // Guard against double-start: switching to the fan view twice without a hide
+  // in between would otherwise leak a second interval polling the same files.
+  stopAutoUpdate();
   updateSensorData();
   const interval = setInterval(updateSensorData, 1000);
   setState('updateInterval', interval);
+}
+
+export function stopAutoUpdate() {
+  const interval = getState('updateInterval');
+  if (interval) {
+    clearInterval(interval);
+    setState('updateInterval', null);
+  }
 }

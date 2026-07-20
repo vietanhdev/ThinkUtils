@@ -1,15 +1,15 @@
+import { escapeHtml } from '../utils.js';
 // Monitor View
 const { invoke } = window.__TAURI__.core;
 import { setState, getState } from '../state.js';
 
 export async function startMonitoring() {
+  stopMonitoring();
   await updateMonitorData();
 
-  const interval = getState('monitorInterval');
-  if (interval) {
-    clearInterval(interval);
-  }
-
+  // The currentView check inside the tick is no longer load-bearing now that
+  // navigation stops this on hide, but it costs nothing and keeps the interval
+  // harmless if it ever outlives its view again.
   const newInterval = setInterval(async () => {
     if (getState('currentView') === 'monitor') {
       await updateMonitorData();
@@ -98,14 +98,14 @@ function displayDiskMonitor(disks) {
     diskDiv.className = 'disk-item';
     diskDiv.innerHTML = `
       <div class="disk-header">
-        <span class="disk-name">${disk.mount_point}</span>
+        <span class="disk-name">${escapeHtml(disk.mount_point)}</span>
         <span class="disk-usage">${disk.usage_percent.toFixed(1)}%</span>
       </div>
       <div class="disk-progress">
         <div class="disk-progress-bar" style="width: ${disk.usage_percent}%"></div>
       </div>
       <div class="disk-details">
-        <span class="disk-device">${disk.device}</span>
+        <span class="disk-device">${escapeHtml(disk.device)}</span>
         <span class="disk-size">${usedGB} GB / ${totalGB} GB</span>
       </div>
     `;
@@ -125,7 +125,7 @@ function displayNetworkMonitor(interfaces) {
     ifaceDiv.className = 'network-item';
     ifaceDiv.innerHTML = `
       <div class="network-header">
-        <span class="network-name">${iface.interface}</span>
+        <span class="network-name">${escapeHtml(iface.interface)}</span>
       </div>
       <div class="network-stats">
         <div class="network-stat">
@@ -161,11 +161,19 @@ function displayProcessMonitor(processes) {
     procDiv.className = 'process-row';
     procDiv.innerHTML = `
       <span class="process-col-pid">${proc.pid}</span>
-      <span class="process-col-name">${proc.name}</span>
+      <span class="process-col-name">${escapeHtml(proc.name)}</span>
       <span class="process-col-cpu">${proc.cpu_percent.toFixed(1)}%</span>
       <span class="process-col-mem">${proc.memory_mb.toFixed(0)} MB</span>
-      <span class="process-col-status">${proc.status}</span>
+      <span class="process-col-status">${escapeHtml(proc.status)}</span>
     `;
     container.appendChild(procDiv);
   });
+}
+
+export function stopMonitoring() {
+  const interval = getState('monitorInterval');
+  if (interval) {
+    clearInterval(interval);
+    setState('monitorInterval', null);
+  }
 }

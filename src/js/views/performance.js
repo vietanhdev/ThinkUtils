@@ -1,6 +1,6 @@
 // Performance View
 const { invoke } = window.__TAURI__.core;
-import { showStatus } from '../utils.js';
+import { setPowerProfile, setCpuGovernor, setTurboBoost, bindOnce } from '../hardwareControls.js';
 
 export async function loadPerformanceInfo() {
   try {
@@ -35,25 +35,9 @@ function displayCpuInfo(info) {
     const btn = document.createElement('button');
     btn.className = `option-btn ${gov === info.governor ? 'active' : ''}`;
     btn.textContent = gov.charAt(0).toUpperCase() + gov.slice(1);
-    btn.onclick = () => setCpuGovernor(gov);
+    btn.onclick = () => setCpuGovernor(gov, loadPerformanceInfo, Array.from(container.children));
     container.appendChild(btn);
   });
-}
-
-async function setCpuGovernor(governor) {
-  try {
-    showStatus(`Setting CPU governor to ${governor}...`, 'info');
-    const response = await invoke('set_cpu_governor', { governor });
-
-    if (response.success) {
-      showStatus(`✓ CPU governor: ${governor}`, 'success');
-      await loadPerformanceInfo();
-    } else {
-      showStatus(`Error: ${response.error}`, 'error');
-    }
-  } catch (error) {
-    showStatus(`Error: ${error}`, 'error');
-  }
 }
 
 function displayPowerProfiles(profileData) {
@@ -67,25 +51,9 @@ function displayPowerProfiles(profileData) {
       .split('-')
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(' ');
-    btn.onclick = () => setPowerProfile(profile);
+    btn.onclick = () => setPowerProfile(profile, loadPerformanceInfo);
     container.appendChild(btn);
   });
-}
-
-async function setPowerProfile(profile) {
-  try {
-    showStatus(`Setting power profile to ${profile}...`, 'info');
-    const response = await invoke('set_power_profile', { profile });
-
-    if (response.success) {
-      showStatus(`✓ Power profile: ${profile}`, 'success');
-      await loadPerformanceInfo();
-    } else {
-      showStatus(`Error: ${response.error}`, 'error');
-    }
-  } catch (error) {
-    showStatus(`Error: ${error}`, 'error');
-  }
 }
 
 function displayTurboStatus(enabled) {
@@ -99,27 +67,10 @@ function displayTurboStatus(enabled) {
 
   if (toggle) {
     toggle.checked = enabled;
-    toggle.removeEventListener('change', handleTurboToggle);
-    toggle.addEventListener('change', handleTurboToggle);
-  }
-}
-
-function handleTurboToggle(e) {
-  setTurboBoost(e.target.checked);
-}
-
-async function setTurboBoost(enabled) {
-  try {
-    showStatus(`${enabled ? 'Enabling' : 'Disabling'} turbo boost...`, 'info');
-    const response = await invoke('set_turbo_boost', { enabled });
-
-    if (response.success) {
-      showStatus(`✓ Turbo boost ${enabled ? 'enabled' : 'disabled'}`, 'success');
-      await loadPerformanceInfo();
-    } else {
-      showStatus(`Error: ${response.error}`, 'error');
-    }
-  } catch (error) {
-    showStatus(`Error: ${error}`, 'error');
+    // Rebound on every render, so bindOnce rather than add/remove of a named
+    // handler -- the Home copy of this leaked a listener per render.
+    bindOnce(toggle, 'change', (e) =>
+      setTurboBoost(e.target.checked, loadPerformanceInfo, e.target)
+    );
   }
 }

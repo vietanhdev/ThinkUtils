@@ -1,7 +1,7 @@
 // Battery View
 const { invoke } = window.__TAURI__.core;
 import { elements } from '../dom.js';
-import { showStatus } from '../utils.js';
+import { showStatus, escapeHtml } from '../utils.js';
 
 export function setupBatteryHandlers() {
   if (elements.thresholdStart) {
@@ -47,8 +47,8 @@ function displayBatteries(batteries) {
     card.className = 'battery-card';
     card.innerHTML = `
       <div class="battery-header">
-        <span class="battery-name">${battery.name}</span>
-        <span class="battery-status">${battery.status}</span>
+        <span class="battery-name">${escapeHtml(battery.name)}</span>
+        <span class="battery-status">${escapeHtml(battery.status)}</span>
       </div>
       <div class="battery-capacity">${battery.capacity}%</div>
       <div class="battery-details">
@@ -66,7 +66,7 @@ function displayBatteries(batteries) {
         </div>
         <div class="battery-detail">
           <span class="battery-detail-label">Technology</span>
-          <span class="battery-detail-value">${battery.technology}</span>
+          <span class="battery-detail-value">${escapeHtml(battery.technology)}</span>
         </div>
       </div>
     `;

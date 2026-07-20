@@ -8,6 +8,7 @@ mod mcp;
 mod monitor;
 mod performance;
 mod permissions;
+mod privileged;
 mod security;
 mod settings;
 mod sync;
@@ -85,9 +86,23 @@ async fn start_drag(app: AppHandle) -> Result<(), String> {
 /// Its absence in a log means the JS never finished booting, which no pixel
 /// check can prove on its own — a window can be fully painted by a frontend
 /// that died halfway through init.
+///
+/// `failed` names the view setups that threw. Each is now isolated, so reaching
+/// this point no longer implies they all succeeded — a boot that wires eight
+/// views out of nine still gets here, and would otherwise look identical to a
+/// clean one.
 #[tauri::command]
-fn report_frontend_ready(templates: usize, views: usize) {
+fn report_frontend_ready(templates: usize, views: usize, failed: Vec<String>) {
     println!("[thinkutils] frontend ready: templates={templates} views={views}");
+    if !failed.is_empty() {
+        // Deliberately loud: the launch test greps this output, and a partially
+        // wired app is the failure mode most likely to pass a screenshot check.
+        eprintln!(
+            "[thinkutils] frontend init had {} failing step(s): {}",
+            failed.len(),
+            failed.join("; ")
+        );
+    }
 }
 
 /// Any uncaught frontend exception or rejection.
