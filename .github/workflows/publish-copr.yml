@@ -114,7 +114,12 @@ jobs:
           # `copr-cli list` prints "Name: <project>" plus an indented block, not a
           # bare name, so grepping for the name alone never matches and the script
           # tries to create a project that already exists.
-          if ! copr-cli list 2>/dev/null | grep -qE "^Name:[[:space:]]+thinkutils$"; then
+          # Herestring, not a pipe into grep -q: grep -q exits on first match,
+          # the upstream command takes SIGPIPE, and pipefail turns a successful
+          # match into a failed test. That exact shape broke the aarch64 release
+          # verification, where finding the file reported it as missing.
+          projects="$(copr-cli list 2>/dev/null || true)"
+          if ! grep -qE "^Name:[[:space:]]+thinkutils$" <<<"$projects"; then
             echo ">> creating COPR project thinkutils"
             # Separate argv entries. "${CHROOTS[@]/#/--chroot }" looks equivalent
             # but puts the space INSIDE one argument, so copr-cli sees a single
